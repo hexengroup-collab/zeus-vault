@@ -1,0 +1,109 @@
+{
+  "name": "zeus-vault",
+  "productName": "Zeus Vault",
+  "version": "1.0.0",
+  "description": "Zeus Vault - Encrypted Desktop Profile Management and Intelligence Archive",
+  "author": "Zeus Vault",
+  "license": "MIT",
+  "private": true,
+  "main": "dist-electron/main/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:renderer": "vite",
+    "build": "tsc -b && vite build --config vite.config.ts && tsc -p tsconfig.node.json --noEmit && vite build --config vite.main.config.ts",
+    "build:main": "vite build --config vite.main.config.ts",
+    "start": "electron .",
+    "package": "npm run build && electron-builder --win --dir",
+    "dist": "npm run build && electron-builder --win",
+    "typecheck": "tsc -b --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test": "vitest run"
+  },
+  "build": {
+    "appId": "com.zeusvault.app",
+    "productName": "Zeus Vault",
+    "artifactName": "ZeusVault-${version}-Setup.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "node_modules/**",
+      "resources/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Zeus Vault",
+      "deleteAppDataOnUninstall": true,
+      "runAfterFinish": true,
+      "perMachine": false,
+      "artifactName": "ZeusVault-${version}-Setup.exe",
+      "uninstallDisplayName": "Zeus Vault",
+      "guid": "com.zeusvault.app",
+      "installerLanguages": "en_US",
+      "useZip": true,
+      "differentialPackage": false
+    },
+    "linux": {
+      "icon": "resources/icon.png"
+    },
+    "toolsets": {
+      "nsis": "0.0.0"
+    },
+    "compression": "normal"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.1",
+    "@tailwindcss/vite": "^4.3.4",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "electron-rebuild": "^3.2.9",
+    "tailwindcss": "^4.3.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@tanstack/react-query": "^5.106.1",
+    "@tanstack/react-table": "^9.3.1",
+    "better-sqlite3": "^13.0.3",
+    "country-flag-icons": "^1.6.20",
+    "exceljs": "^4.4.0",
+    "gsap": "^3.15.1",
+    "i18next": "^26.7.2",
+    "lucide-react": "^1.70.0",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-i18next": "^17.1.13",
+    "react-router-dom": "^7.18.5",
+    "sharp": "^0.35.5",
+    "terminal-kit": "^3.1.4",
+    "zod": "^4.6.7",
+    "zustand": "^5.0.16"
+  }
+}
