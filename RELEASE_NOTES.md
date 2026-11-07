@@ -41,4 +41,10 @@ After downloading, verify the installer matches the published checksum:
 certutil -hashfile .\ZeusVault-1.0.0-Setup.exe SHA256
 ```
 
+Or read it from the `SHA256SUMS.txt` file in the repository root:
+
+```
+807c605f73732ffda5485956dbdadf6018777c0195720412425149b8981eb67d  ZeusVault-1.0.0-Setup.exe
+```
+
 Compare to the hash published on the release page. If the hash differs, do not run the file.
