@@ -6,19 +6,10 @@ import { detectPeople, type DetectedFace } from '@/lib/facefinder'
 import { toastError, toastOk } from '@/stores/toast'
 import type { ProfileListItem } from '@shared/types'
 
-const FEATURE_POINTS = [0, 8, 16, 36, 39, 42, 45, 48, 54, 27, 30]
+const FEATURE_POINTS = [1, 33, 263, 468, 473, 61, 291, 199, 90, 13, 14, 234, 454, 127, 356]
 const MESH_LINKS: [number, number][] = []
-for (let i = 0; i < 16; i++) MESH_LINKS.push([i, i + 1])
-for (let i = 17; i < 24; i++) MESH_LINKS.push([i, i + 1])
-for (let i = 27; i < 34; i++) MESH_LINKS.push([i, i + 1])
-for (let i = 36; i < 41; i++) MESH_LINKS.push([i, i + 1])
-MESH_LINKS.push([41, 36])
-for (let i = 42; i < 47; i++) MESH_LINKS.push([i, i + 1])
-MESH_LINKS.push([47, 42])
-for (let i = 48; i < 59; i++) MESH_LINKS.push([i, i + 1])
-MESH_LINKS.push([59, 48])
-for (let i = 61; i < 67; i++) MESH_LINKS.push([i, i + 1])
-MESH_LINKS.push([67, 61])
+for (let i = 0; i < 467; i = i + 2) MESH_LINKS.push([i, i + 1])
+for (let i = 1; i < 467; i = i + 3) MESH_LINKS.push([i, i + 2])
 const BOX_COLORS = ['#E34B64', '#5F8FB0', '#4F8A6B', '#D69B45', '#8A7FB0', '#7A8B9A', '#C86F4A']
 
 export function PersonFinder() {

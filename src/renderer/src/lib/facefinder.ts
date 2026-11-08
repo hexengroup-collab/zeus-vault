@@ -1,12 +1,10 @@
-// Local deep face matching (face-api.js descriptors, same approach as
-// ageitgey/face_recognition: detection + 128-dim descriptors + distance).
-// Models ship in public/models2 so everything runs on-device.
+// Hybrid local face engine:
+//  - MediaPipe FaceLandmarker detects faces incl. side profiles + 478 landmarks
+//  - face-api descriptor net emits deep 128-dim descriptors for matching
+//  - geometry (eye/mouth/ear/chin ratios) kept for evidence
+// Everything runs on-device; model assets ship in public/.
 import * as tf from '@tensorflow/tfjs'
-import {
-  nets,
-  detectAllFaces,
-  SsdMobilenetv1Options,
-} from '@vladmandic/face-api'
+import { nets } from '@vladmandic/face-api'
 
 export interface DetectedFace {
   index: number
@@ -17,23 +15,45 @@ export interface DetectedFace {
   match: { profileId: string; score: number; distance: number | null; name: string; code: string } | null
 }
 
-let readyPromise: Promise<boolean> | null = null
+interface Landmarker {
+  detect: (img: HTMLImageElement) => { faceLandmarks: { x: number; y: number }[][] }
+  close: () => void
+}
 
-export async function ensureFaceModels(): Promise<boolean> {
-  if (!readyPromise) {
-    readyPromise = (async () => {
+let faPromise: Promise<void> | null = null
+let mpPromise: Promise<Landmarker> | null = null
+
+async function getApi(): Promise<void> {
+  if (!faPromise) {
+    faPromise = (async () => {
       await tf.setBackend('cpu')
       await tf.ready()
       const uri = new URL('models2', document.baseURI).href
-      await Promise.all([
-        nets.ssdMobilenetv1.loadFromUri(uri),
-        nets.faceLandmark68Net.loadFromUri(uri),
-        nets.faceRecognitionNet.loadFromUri(uri),
-      ])
-      return true
+      await nets.faceRecognitionNet.loadFromUri(uri)
     })()
   }
-  return readyPromise
+  return faPromise
+}
+
+async function getLandmarker(): Promise<Landmarker> {
+  if (!mpPromise) {
+    mpPromise = (async () => {
+      const { FilesetResolver, FaceLandmarker } = await import('@mediapipe/tasks-vision')
+      const fileset = await FilesetResolver.forVisionTasks(new URL('wasm', document.baseURI).href)
+      const modelUrl = new URL('models/face_landmarker.task', document.baseURI).href
+      const buf = new Uint8Array(await (await fetch(modelUrl)).arrayBuffer())
+      return FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetBuffer: buf },
+        runningMode: 'IMAGE',
+        numFaces: 20,
+        minFaceDetectionConfidence: 0.5,
+        minFacePresenceConfidence: 0.5,
+        outputFacialTransformationMatrixes: false,
+        outputFaceBlendshapes: false,
+      } as never)
+    })()
+  }
+  return mpPromise
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -45,9 +65,22 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-function cropFace(img: HTMLImageElement, box: { x: number; y: number; w: number; h: number }): string {
+function cropToImage(img: HTMLImageElement, box: { x: number; y: number; w: number; h: number }, size = 160): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return reject(new Error('Canvas unavailable'))
+    ctx.fillStyle = '#0D0F12'
+    ctx.fillRect(0, 0, size, size)
+    ctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, size, size)
+    resolve(canvas)
+  })
+}
+
+function cropToDataUrl(img: HTMLImageElement, box: { x: number; y: number; w: number; h: number }, size = 160): string {
   const canvas = document.createElement('canvas')
-  const size = 160
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
@@ -59,32 +92,48 @@ function cropFace(img: HTMLImageElement, box: { x: number; y: number; w: number;
 }
 
 export async function detectPeople(imageSrc: string): Promise<DetectedFace[]> {
-  await ensureFaceModels()
+  await getApi()
   const img = await loadImage(imageSrc)
-  const detections = await detectAllFaces(img, new SsdMobilenetv1Options({ minConfidence: 0.5 })).withFaceLandmarks().withFaceDescriptors()
-  return detections
-    .map((d) => {
-      const raw = d as unknown as { box?: { x: number; y: number; width: number; height: number }; detection?: { box: { x: number; y: number; width: number; height: number } }; landmarks?: { positions?: { x: number; y: number }[] }; descriptor?: Array<number> }
-      const b = raw.detection?.box ?? raw.box ?? { x: 0, y: 0, width: 0, height: 0 }
-      const desc = raw.descriptor ? Array.from(raw.descriptor as unknown as Array<number>) : null
-      return {
-        _b: b,
-        _lm: raw.landmarks?.positions ?? [],
-        _desc: desc,
-      }
+  const landmarker = await getLandmarker()
+  const result = landmarker.detect(img) as { faceLandmarks: { x: number; y: number }[][] }
+  const lmList = result.faceLandmarks ?? []
+  const out: DetectedFace[] = []
+  for (const lm of lmList) {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const p of lm) {
+      if (p.x < minX) minX = p.x
+      if (p.x > maxX) maxX = p.x
+      if (p.y < minY) minY = p.y
+      if (p.y > maxY) maxY = p.y
+    }
+    const pad = Math.max(maxX - minX, maxY - minY) * 0.12
+    const box = {
+      x: Math.max(0, (minX - pad) * img.naturalWidth),
+      y: Math.max(0, (minY - pad) * img.naturalHeight),
+      w: Math.min(img.naturalWidth, (maxX - minX + pad * 2) * img.naturalWidth),
+      h: Math.min(img.naturalHeight, (maxY - minY + pad * 2) * img.naturalHeight),
+    }
+    let desc: number[] | null = null
+    try {
+      const cropped = await cropToImage(img, box)
+      const d = await nets.faceRecognitionNet.computeFaceDescriptor(cropped as unknown as HTMLCanvasElement)
+      desc = d ? Array.from(d as unknown as Array<number>) : null
+    } catch {
+      desc = null
+    }
+    out.push({
+      index: out.length,
+      box,
+      landmarks: lm,
+      crop: cropToDataUrl(img, box),
+      desc,
+      match: null,
     })
-    .sort((a, b) => a._b.x - b._b.x)
-    .map((d, i) => {
-      const box = { x: d._b.x, y: d._b.y, w: d._b.width, h: d._b.height }
-      return {
-        index: i,
-        box,
-        landmarks: d._lm,
-        crop: cropFace(img, box),
-        desc: d._desc,
-        match: null,
-      }
-    })
+  }
+  return out
 }
 
 export async function captureDescriptor(imageSrc: string): Promise<number[] | null> {
