@@ -1,12 +1,15 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import gsap from 'gsap'
-import { Bookmark, CornerDownLeft, Scan, Trash2, Wand2 } from 'lucide-react'
+import { Bookmark, CornerDownLeft, Image as ImageIcon, QrCode, Scan, Trash2, Wand2 } from 'lucide-react'
 import { call, zeus } from '@/lib/api'
+import { decodeQr, fileToDataUrl } from '@/lib/images'
+import { Avatar } from '@/components/Avatar'
+import { defaultAvatar } from '@/lib/format'
 import { useAsync } from '@/lib/useAsync'
 import { ProfileTable, buildDefaultColumns } from '@/components/ProfileTable'
 import { toastError, toastOk } from '@/stores/toast'
-import type { SavedSearch, SearchResults } from '@shared/types'
+import type { PhotoMatch, PhotoQueueStatus, SavedSearch, SearchResults } from '@shared/types'
 
 const EXAMPLES = [
   'Show profiles created by me',
@@ -26,12 +29,83 @@ export function SearchPage() {
   const [result, setResult] = useState<SearchResults | null>(null)
   const [searching, setSearching] = useState(false)
   const [page, setPage] = useState(1)
-  const [mode, setMode] = useState<'text' | 'semantic' | 'documents'>('text')
+  const [mode, setMode] = useState<'text' | 'semantic' | 'documents' | 'photos'>('text')
   const [semantic, setSemantic] = useState<{ profileId: string; score: number }[]>([])
   const [docs, setDocs] = useState<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>([])
   const [docStatus, setDocStatus] = useState<{ done: number; pending: number; failed: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const scanRef = useRef<HTMLDivElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  const [preview, setPreview] = useState<string | null>(null)
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([])
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [kinds, setKinds] = useState<('attachment' | 'gallery' | 'avatar')[]>(['attachment'])
+  const [qr, setQr] = useState<string | null>(null)
+  const [qrDocs, setQrDocs] = useState<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>([])
+  const [compare, setCompare] = useState<{ match: PhotoMatch } | null>(null)
+  const [, setQueue] = useState<PhotoQueueStatus | null>(null)
+
+  useEffect(() => {
+    if (mode !== 'photos') return
+    let alive = true
+    const t = setInterval(() => {
+      void call(zeus.photos.status())
+        .then((s) => {
+          if (alive) setQueue(s)
+        })
+        .catch(() => {})
+    }, 3000)
+    void call(zeus.photos.status())
+      .then((s) => {
+        if (alive) setQueue(s)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [mode])
+
+  const runPhotoSearch = async (url: string) => {
+    setPhotoMatches([])
+    setPhotoBusy(true)
+    try {
+      const r = await call(zeus.photos.search({ dataUrl: url, kinds }))
+      setPhotoMatches(r.matches)
+    } catch (e) {
+      toastError('Image search failed', e instanceof Error ? e.message : undefined)
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
+  const onPhotoFile = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      const url = await fileToDataUrl(file, 512, 0.85)
+      setPreview(URL.createObjectURL(file))
+      setDataUrl(url)
+      await runPhotoSearch(url)
+      try {
+        const payload = await decodeQr(url)
+        setQr(payload)
+        setQrDocs(payload ? await call(zeus.photos.docSearch(payload.slice(0, 120))) : [])
+      } catch {
+        setQr(null)
+      }
+    } catch (e) {
+      toastError('Image search failed', e instanceof Error ? e.message : undefined)
+    }
+  }
+
+  const toggleKind = (k: 'attachment' | 'gallery' | 'avatar') => {
+    setKinds((prev) => {
+      const next = prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]
+      return next.length ? next : prev
+    })
+  }
 
   const { data: saved, reload: reloadSaved } = useAsync(() => call(zeus.search.saved()), [])
   const { data: recent, reload: reloadRecent } = useAsync(() => call(zeus.search.recent()), [])
@@ -140,6 +214,7 @@ export function SearchPage() {
           <button onClick={() => setMode('text')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'text' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Text + NLP</button>
           <button onClick={() => setMode('semantic')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'semantic' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Semantic</button>
           <button onClick={() => setMode('documents')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'documents' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Documents (OCR)</button>
+          <button onClick={() => setMode('photos')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'photos' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Photos</button>
           {mode === 'documents' && (
             <button className="px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-vault-text2 hover:text-vault-text" onClick={() => void call(zeus.photos.ocrAll()).then((r) => toastOk('OCR queued', `${r.queued} document(s) queued`)).catch((e) => toastError('OCR failed', e instanceof Error ? e.message : undefined))}>
               OCR all attachments
@@ -220,6 +295,80 @@ export function SearchPage() {
               <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-vault-muted">Scanning archive…</div>
             </div>
           )}
+          {!searching && mode === 'photos' && (
+            <div className="p-4">
+              <div
+                className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-white/15 p-6 text-center hover:border-vault-red/50"
+                onClick={() => imageInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  void onPhotoFile(e.dataTransfer.files?.[0])
+                }}
+              >
+                {preview ? (
+                  <img src={preview} alt="Query photo" className="max-h-36 object-contain" />
+                ) : (
+                  <>
+                    <ImageIcon size={20} className="text-vault-muted" />
+                    <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-vault-text2">Drop a photo — matches objects in attachments & documents</span>
+                  </>
+                )}
+                <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => void onPhotoFile(e.target.files?.[0])} />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-vault-muted">Search in</span>
+                {(['attachment', 'gallery', 'avatar'] as const).map((k) => (
+                  <button key={k} onClick={() => toggleKind(k)} className={`px-2.5 py-1.5 font-mono text-[8px] uppercase tracking-[0.15em] transition-colors ${kinds.includes(k) ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>
+                    {k === 'attachment' ? 'Attachments' : k === 'gallery' ? 'Gallery' : 'Avatars'}
+                  </button>
+                ))}
+                <button
+                  className="vault-btn vault-btn-primary h-9"
+                  disabled={!dataUrl || photoBusy}
+                  onClick={() => dataUrl && void runPhotoSearch(dataUrl)}
+                >
+                  <Scan size={12} /> {photoBusy ? 'Matching…' : 'Search again'}
+                </button>
+              </div>
+              {qr && (
+                <div className="mt-3 border border-vault-amber/40 bg-vault-amber/[0.06] p-3">
+                  <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.18em] text-vault-amber"><QrCode size={12} /> QR decoded</div>
+                  <div className="mt-1 break-all font-mono text-[10px] leading-relaxed text-vault-text">{qr.slice(0, 300)}</div>
+                  {qrDocs.length > 0 && (
+                    <div className="mt-2">
+                      <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-vault-muted">Documents mentioning this code</div>
+                      {qrDocs.map((d) => (
+                        <a key={d.attachmentId} href={`#/profiles/${d.profileId}`} className="mt-1 block font-mono text-[9px] text-vault-text2 hover:text-vault-text">{d.name} — {d.snippet.slice(0, 90)}</a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {photoMatches.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {photoMatches.map((m) => (
+                    <div key={m.tokenId} className="flex items-center gap-3 border border-white/[0.08] bg-white/[0.02] p-3">
+                      {m.image ? (
+                        <img src={m.image} alt={m.label} className="h-11 w-11 shrink-0 rounded-[3px] object-cover" />
+                      ) : (
+                        <Avatar src={defaultAvatar('?')} name="?" size={44} />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-mono text-[9px] uppercase tracking-[0.18em] text-vault-text2">{m.label}</div>
+                        <div className="font-mono text-[8px] text-vault-muted">{m.score.toFixed(1)}% · phash {m.phashSim} · color {m.histSim}</div>
+                      </div>
+                      <button className="vault-btn !px-2 !py-1 font-mono text-[8px]" onClick={() => setCompare({ match: m })}>COMPARE</button>
+                      <button className="vault-btn !px-2 !py-1 font-mono text-[8px]" onClick={() => navigate(`/profiles/${m.profileId}`)}>OPEN</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {photoMatches.length === 0 && !photoBusy && (
+                <p className="mt-4 text-center font-mono text-[8px] uppercase tracking-[0.25em] text-vault-muted">Drop a photo — objects match attachment & document images only</p>
+              )}
+            </div>
+          )}
           {!searching && !result && docs.length > 0 && (
             <div className="p-4">
               <div className="micro-label mb-2">
@@ -271,6 +420,30 @@ export function SearchPage() {
               <button className="vault-btn vault-btn-ghost !px-2 !py-1" disabled={page <= 1} onClick={() => void run(query, page - 1)}>Prev</button>
               <span>{page} / {pageCount}</span>
               <button className="vault-btn vault-btn-ghost !px-2 !py-1" disabled={page >= pageCount} onClick={() => void run(query, page + 1)}>Next</button>
+            </div>
+          </div>
+        )}
+        {compare && dataUrl && compare.match.image && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-6" onClick={() => setCompare(null)}>
+            <div className="w-full max-w-3xl border border-vault-border bg-[#121419] p-5" onClick={(e) => e.stopPropagation()}>
+              <div className="micro-label">Visual verification — side by side</div>
+              <div className="mt-3 grid grid-cols-2 gap-4">
+                <div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-vault-muted">Uploaded photo</div>
+                  <img src={dataUrl} alt="Query" className="mt-2 max-h-72 w-full border border-white/10 object-cover" />
+                </div>
+                <div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-vault-muted">Matched record</div>
+                  <img src={compare.match.image} alt="Candidate" className="mt-2 max-h-72 w-full border border-white/10 object-cover" />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="font-mono text-[10px] text-vault-text2">{compare.match.label} · <span className="text-vault-red">{compare.match.score.toFixed(1)}%</span></span>
+                <span className="flex gap-2">
+                  <button className="vault-btn vault-btn-ghost" onClick={() => setCompare(null)}>Close</button>
+                  <button className="vault-btn vault-btn-primary" onClick={() => navigate(`/profiles/${compare.match.profileId}`)}>Open dossier</button>
+                </span>
+              </div>
             </div>
           </div>
         )}
