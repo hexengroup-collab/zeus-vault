@@ -14,7 +14,7 @@ export interface DetectedFace {
   landmarks: { x: number; y: number }[]
   crop: string
   desc: number[] | null
-  match: { profileId: string; score: number; name: string; code: string } | null
+  match: { profileId: string; score: number; distance: number | null; name: string; code: string } | null
 }
 
 let readyPromise: Promise<boolean> | null = null

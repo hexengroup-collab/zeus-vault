@@ -85,16 +85,23 @@ export function ImageSearch() {
       const all = await call(zeus.profiles.list({ view: 'all-status', page: 1, pageSize: 250 }))
       let n = 0
       for (const p of all.rows) {
-        if (!p.avatar) continue
-        const desc = await captureDescriptor(p.avatar)
-        if (desc) {
-          await call(zeus.photos.saveDesc({ profileId: p.id, desc, kind: 'avatar' }))
-          n++
+        const detail = await call(zeus.profiles.get(p.id))
+        const sources: { url: string; kind: 'avatar' | 'gallery' | 'attachment' }[] = [
+          ...(detail.avatar ? [{ url: detail.avatar, kind: 'avatar' as const }] : []),
+          ...(detail.images ?? []).map((i) => ({ url: i.dataUrl, kind: 'gallery' as const })),
+          ...(detail.attachments ?? []).filter((a) => a.mime.startsWith('image/')).map((a) => ({ url: a.dataUrl, kind: 'attachment' as const })),
+        ]
+        for (const s of sources) {
+          const desc = await captureDescriptor(s.url)
+          if (desc) {
+            await call(zeus.photos.saveDesc({ profileId: p.id, desc, kind: s.kind }))
+            n++
+          }
+          await new Promise((r) => setTimeout(r, 30))
         }
-        await new Promise((r) => setTimeout(r, 50))
       }
       setGeomDone(true)
-      toastOk('Face descriptors built', `${n} avatar(s) now carry deep face data`)
+      toastOk('Face descriptors built', `${n} photo(s) now carry deep face data`)
     } catch (e) {
       toastError('Backfill failed', e instanceof Error ? e.message : undefined)
     } finally {

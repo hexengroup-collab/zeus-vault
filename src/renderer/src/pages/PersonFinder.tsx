@@ -91,7 +91,7 @@ export function PersonFinder() {
           try {
             const hits = await call(zeus.photos.matchFace({ cropDataUrl: f.crop, geom: undefined, desc: f.desc ?? undefined }))
             const best = hits[0]
-            return best ? { ...f, match: { profileId: best.profileId, score: best.score, name: best.name, code: best.code } } : f
+            return best ? { ...f, match: { profileId: best.profileId, score: best.score, distance: best.distance, name: best.name, code: best.code } } : f
           } catch {
             return f
           }
@@ -163,7 +163,7 @@ export function PersonFinder() {
                       <g>
                         <rect x={f.box.x} y={Math.max(0, f.box.y - dims.h * 0.055)} width={dims.w * 0.34} height={dims.h * 0.05} fill="#0D0F12" stroke={c} strokeWidth={1.5} />
                       <text x={f.box.x + 6} y={Math.max(0, f.box.y - dims.h * 0.016)} fill={c} fontSize={dims.h * 0.032} fontFamily="monospace">
-                        {`#${f.index + 1} ${f.match.score >= 85 ? f.match.name : f.match.score >= 70 ? `~${f.match.name}` : 'no confident match'} ${f.match.score.toFixed(0)}%`}
+                        {`#${f.index + 1} ${f.match.score >= 85 ? f.match.name : f.match.score >= 70 ? `~${f.match.name}` : 'no confident match'} d=${f.match.distance !== null && f.match.distance !== undefined ? f.match.distance.toFixed(2) : '?'} ${f.match.score.toFixed(0)}%`}
                       </text>
                       </g>
                     ) : (

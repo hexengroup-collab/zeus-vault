@@ -262,7 +262,7 @@ export class PhotosService {
     }
     return ranked.map((m) => {
       const p = this.db.get<{ full_name: string; profile_code: string; avatar_blob: string | null }>('SELECT full_name, profile_code, avatar_blob FROM profiles WHERE id = ?', [m.profileId])
-      return { ...m, name: p?.full_name ?? 'Unknown', code: p?.profile_code ?? '', avatar: p?.avatar_blob ?? null }
+      return { profileId: m.profileId, score: m.score, distance: m.distance, phashSim: m.phashSim, faceSim: m.faceSim, name: p?.full_name ?? 'Unknown', code: p?.profile_code ?? '', avatar: p?.avatar_blob ?? null }
     })
   }
 
