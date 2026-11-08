@@ -373,6 +373,42 @@ export class PhotosService {
     return { tokenId: id }
   }
 
+  inheritFaceData(newProfileId: string, sourceProfileId: string): { rows: number } {
+    if (newProfileId === sourceProfileId) throw new AppError('VALIDATION', 'Source and target must differ.')
+    const src = this.db.get<{ id: string }>('SELECT id FROM profiles WHERE id = ?', [sourceProfileId])
+    if (!src) throw new AppError('NOT_FOUND', 'Source profile not found.')
+    const tgt = this.db.get<{ id: string }>('SELECT id FROM profiles WHERE id = ? AND deleted_at IS NULL', [newProfileId])
+    if (!tgt) throw new AppError('NOT_FOUND', 'Target profile not found.')
+    const rows = this.db.all<TokenRow>('SELECT * FROM photo_tokens WHERE profile_id = ?', [sourceProfileId])
+    const now = new Date().toISOString()
+    for (const r of rows) {
+      this.db.run(
+        `INSERT INTO photo_tokens(id, profile_id, image_id, kind, phash, ahash, face_detected, face_phash, face_box, face_geom, face_desc, histogram, status, attempts, error, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          crypto.randomUUID(),
+          newProfileId,
+          r.image_id,
+          r.kind,
+          r.phash,
+          r.ahash,
+          r.face_detected,
+          r.face_phash,
+          r.face_box,
+          r.face_geom,
+          (r as TokenRow).face_desc ?? null,
+          r.histogram,
+          r.status,
+          r.attempts,
+          r.error,
+          now,
+          now,
+        ],
+      )
+    }
+    return { rows: rows.length }
+  }
+
   async recheck(profileId: string): Promise<{ phash: string; faceDetected: boolean }> {
     const r = this.db.get<{ avatar_blob: string | null }>('SELECT avatar_blob FROM profiles WHERE id = ?', [profileId])
     if (!r?.avatar_blob) throw new AppError('NOT_FOUND', 'Profile has no photograph.')

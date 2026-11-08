@@ -13,6 +13,7 @@ import {
   Paperclip,
   Pencil,
   RotateCcw,
+  ScanFace,
   Star,
   StickyNote,
   Trash2,
@@ -56,6 +57,33 @@ export function Dossier() {
   const { data: auditTrail } = useAsync(() => call(zeus.profiles.audit(id!)), [id])
   const { data: tokens } = useAsync(() => call(zeus.photos.profile(id!)), [id, data?.avatar])
   const avatarToken = tokens?.find((t) => t.kind === 'avatar')
+  const [inheritOpen, setInheritOpen] = useState(false)
+  const [inheritQuery, setInheritQuery] = useState('')
+  const [inheritResults, setInheritResults] = useState<{ id: string; fullName: string; profileCode: string; status: string }[]>([])
+
+  const searchInherit = async (q: string) => {
+    setInheritQuery(q)
+    if (!q.trim()) {
+      setInheritResults([])
+      return
+    }
+    try {
+      const r = await call(zeus.profiles.list({ search: q.trim().slice(0, 60), view: 'all-status', page: 1, pageSize: 8 }))
+      setInheritResults(r.rows.filter((x) => x.id !== id).map((x) => ({ id: x.id, fullName: x.fullName, profileCode: x.profileCode, status: x.status })))
+    } catch {
+      setInheritResults([])
+    }
+  }
+
+  const doInherit = async (sourceId: string) => {
+    try {
+      await call(zeus.photos.inherit({ profileId: id!, sourceProfileId: sourceId }))
+      toastOk('Face data cloned', 'Reference photos now attached to this dossier')
+      setInheritOpen(false)
+    } catch (e) {
+      toastError('Inherit failed', e instanceof Error ? e.message : undefined)
+    }
+  }
 
   useEffect(() => {
     if (data) setFavorite(data.isFavorite)
@@ -229,6 +257,7 @@ export function Dossier() {
                 <Star size={12} className={isFavorite ? 'fill-vault-amber text-vault-amber' : ''} /> {isFavorite ? 'Favorited' : 'Favorite'}
               </button>
               {!isReadOnly && <button className="vault-btn" onClick={() => void doDuplicate()}><Copy size={12} /> Duplicate</button>}
+              {!isReadOnly && <button className="vault-btn" onClick={() => void setInheritOpen(true)}><ScanFace size={12} /> Inherit face data</button>}
               <button className="vault-btn" onClick={() => void copyAll()}><Copy size={12} /> Copy All</button>
               <button className="vault-btn" onClick={() => void exportPdf()}><Download size={12} /> Dossier PDF</button>
               {!isReadOnly && (
@@ -240,6 +269,27 @@ export function Dossier() {
             </div>
           </div>
         </div>
+
+        {inheritOpen && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-6" onClick={() => setInheritOpen(false)}>
+            <div className="w-full max-w-md border border-vault-border bg-[#121419] p-5" onClick={(e) => e.stopPropagation()}>
+              <div className="micro-label">Inherit face data for this person</div>
+              <input autoFocus value={inheritQuery} onChange={(e) => void searchInherit(e.target.value)} placeholder="Search another dossier of the same person…" className="vault-input mt-3 h-10 w-full px-3 text-[11px]" />
+              <div className="mt-2 space-y-1">
+                {inheritResults.map((c) => (
+                  <button key={c.id} onClick={() => void doInherit(c.id)} className="flex w-full items-center justify-between border border-white/[0.06] px-2 py-1.5 text-left hover:border-vault-red/40">
+                    <span className="text-[11px] text-vault-text2">{c.fullName}</span>
+                    <span className="font-mono text-[8px] text-vault-muted">{c.profileCode} · {c.status}</span>
+                  </button>
+                ))}
+                {inheritResults.length === 0 && <div className="font-mono text-[9px] text-vault-muted">Type at least 2 characters…</div>}
+              </div>
+              <div className="mt-3 text-right">
+                <button className="vault-btn vault-btn-ghost" onClick={() => setInheritOpen(false)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Proximity zoom floating preview */}
         {hoveredZoom && (

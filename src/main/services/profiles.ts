@@ -970,7 +970,12 @@ export class ProfilesService {
       this.audit.record(actor, { eventType: 'PROFILE_RESTORED', targetType: 'profile', targetId: id, targetLabel: p.full_name, detail: 'Profile restored from archive' })
     } else {
       this.db.run('UPDATE profiles SET deleted_by = ?, deleted_at = ?, status = ? WHERE id = ?', [actor.username, now, 'archived', id])
-      this.audit.record(actor, { eventType: 'PROFILE_DELETED', targetType: 'profile', targetId: id, targetLabel: p.full_name, detail: 'Profile soft-deleted' })
+      // Soft-delete keeps the row for the ledger; intelligence stores must
+      // not keep finding (or identifying) a removed person.
+      this.db.run('DELETE FROM photo_tokens WHERE profile_id = ?', [id])
+      this.db.run('DELETE FROM document_text WHERE profile_id = ?', [id])
+      this.db.run('DELETE FROM text_embeddings WHERE profile_id = ?', [id])
+      this.audit.record(actor, { eventType: 'PROFILE_DELETED', targetType: 'profile', targetId: id, targetLabel: p.full_name, detail: 'Profile soft-deleted, face/photo/document intelligence purged' })
     }
     this.syncFts(id)
   }
@@ -1027,6 +1032,34 @@ export class ProfilesService {
       },
     }
     const copy = this.create(input, actor)
+    // Carry face/photo intelligence to the duplicate automatically.
+    const srcTokens = this.db.all<Record<string, unknown>>('SELECT * FROM photo_tokens WHERE profile_id = ?', [id])
+    const now = new Date().toISOString()
+    for (const r of srcTokens) {
+      this.db.run(
+        `INSERT INTO photo_tokens(id, profile_id, image_id, kind, phash, ahash, face_detected, face_phash, face_box, face_geom, face_desc, histogram, status, attempts, error, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          crypto.randomUUID(),
+          copy.id,
+          r.image_id as string | null,
+          r.kind,
+          r.phash,
+          r.ahash,
+          r.face_detected as number,
+          r.face_phash,
+          r.face_box,
+          (r as { face_geom?: string }).face_geom ?? null,
+          (r as { face_desc?: string }).face_desc ?? null,
+          r.histogram,
+          r.status,
+          r.attempts as number,
+          (r as { error?: string }).error ?? null,
+          now,
+          now,
+        ],
+      )
+    }
     this.audit.record(actor, {
       eventType: 'PROFILE_DUPLICATED',
       targetType: 'profile',

@@ -266,6 +266,10 @@ export function registerIpc(ctx: AppContext): void {
     ctx.photos!.saveDesc(String(payload.profileId ?? ''), payload.desc, payload.kind ?? 'avatar')
     return null
   })
+  handle('photos:inherit', 'standard', (payload: { profileId: string; sourceProfileId: string }) => {
+    ctx.photos!.inheritFaceData(String(payload.profileId ?? ''), String(payload.sourceProfileId ?? ''))
+    return null
+  })
   handle('docs:status', 'unlock', () => ctx.docs!.status({ ...actorOf(), userId: userIdOf() } as never))
   handle('docs:ocrAll', 'standard', () => ctx.docs!.enqueueAll())
   handle('docs:search', 'unlock', (text: string) => ctx.docs!.search(String(text ?? '')))

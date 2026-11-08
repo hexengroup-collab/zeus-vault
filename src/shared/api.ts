@@ -103,6 +103,7 @@ export interface ZeusApi {
     profile: (profileId: string) => Promise<ApiResult<{ kind: string; status: string; faceDetected: boolean; phash: string | null }[]>>
     matchFace: (payload: { cropDataUrl?: string; geom?: number[]; desc?: number[]; quality?: number } | string) => Promise<ApiResult<{ profileId: string; score: number; distance: number | null; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]>>
     saveDesc: (payload: { profileId: string; desc: number[]; kind?: 'avatar' | 'gallery' | 'attachment' }) => Promise<ApiResult<null>>
+    inherit: (payload: { profileId: string; sourceProfileId: string }) => Promise<ApiResult<null>>
     saveGeom: (payload: { profileId: string; geom: number[]; kind?: 'avatar' | 'gallery' | 'attachment' }) => Promise<ApiResult<null>>
     saveFace: (payload: { profileId: string; cropDataUrl: string; geom?: number[]; desc?: number[] }) => Promise<ApiResult<{ tokenId: string }>>
     docStatus: () => Promise<ApiResult<{ queued: number; processing: number; done: number; failed: number; lastError: string | null }>>
