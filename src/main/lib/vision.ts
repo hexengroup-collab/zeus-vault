@@ -254,7 +254,7 @@ export function biometricsFromLandmarks(lm: { x: number; y: number }[]): number[
   if (!Number.isFinite(height) || height < 1e-6) return null
   const io = dist(pt(IO_A), pt(IO_B))
   const eyeMid = { x: (pt(IO_A).x + pt(IO_B).x) / 2, y: (pt(IO_A).y + pt(IO_B).y) / 2 }
-  const dz = (a: { z?: number }, b: { z?: number }) => Math.abs((a.z ?? 0) - (b.z ?? 0)) / height
+  const dz = (a: { x: number; y: number; z?: number }, b: { x: number; y: number; z?: number }) => Math.abs((a.z ?? 0) - (b.z ?? 0)) / height
   const feats = [
     dist(pt(NOSE), pt(CHIN)) / height,
     dist(eyeMid, pt(NOSE)) / height,
