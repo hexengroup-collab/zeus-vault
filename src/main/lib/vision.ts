@@ -89,38 +89,52 @@ export function histogramFromRgb(rgb: Uint8Array, w: number, h: number): number[
 }
 
 function isSkin(r: number, g: number, b: number): boolean {
-  return r > 95 && r > g && r > b && r - g > 10 && r - b > 8 && r < 250 && Math.abs(r - g) < 80
+  // Wide-tone range: avoids bias against darker skin tones.
+  return r > 40 && r >= g && r >= b && r - g > 4 && r - b > 2 && r < 250 && Math.abs(r - g) < 90
 }
 
 function findFaceLikeRegion(rgb: Uint8Array, w: number, h: number): { x: number; y: number; w: number; h: number } | null {
-  let minX = w
-  let minY = h
-  let maxX = -1
-  let maxY = -1
-  let count = 0
+  // Cluster skin pixels on an 8x8 grid and box the densest cluster,
+  // so scattered skin tones elsewhere do not blow up the region.
+  const cells = Array.from({ length: 64 }, () => 0)
+  const cw = w / 8
+  const ch = h / 8
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 3
       if (!isSkin(rgb[i], rgb[i + 1], rgb[i + 2])) continue
-      count++
-      if (x < minX) minX = x
-      if (x > maxX) maxX = x
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
+      cells[Math.min(7, Math.floor(y / ch)) * 8 + Math.min(7, Math.floor(x / cw))]++
     }
   }
-  if (maxX < 0 || count === 0) return null
-  const bw = maxX - minX + 1
-  const bh = maxY - minY + 1
-  const areaFrac = (bw * bh) / (w * h)
-  if (areaFrac < 0.01 || areaFrac > 0.6) return null
-  const pad = Math.round(Math.max(bw, bh) * 0.15)
-  return {
-    x: Math.max(0, minX - pad),
-    y: Math.max(0, minY - pad),
-    w: Math.min(w - Math.max(0, minX - pad), bw + pad * 2),
-    h: Math.min(h - Math.max(0, minY - pad), bh + pad * 2),
+  let best = 0
+  for (const c of cells) if (c > best) best = c
+  if (best < Math.max(40, (w * h) / 400)) return null
+  const thresh = best * 0.25
+  let minX = w
+  let minY = h
+  let maxX = -1
+  let maxY = -1
+  let total = 0
+  for (let cy = 0; cy < 8; cy++) {
+    for (let cx = 0; cx < 8; cx++) {
+      if (cells[cy * 8 + cx] < thresh) continue
+      total += cells[cy * 8 + cx]
+      if (cx * cw < minX) minX = cx * cw
+      if (cy * ch < minY) minY = cy * ch
+      if ((cx + 1) * cw > maxX) maxX = (cx + 1) * cw
+      if ((cy + 1) * ch > maxY) maxY = (cy + 1) * ch
+    }
   }
+  if (maxX < 0 || total === 0) return null
+  const bw = maxX - minX
+  const bh = maxY - minY
+  if (bw < 4 || bh < 4) return null
+  const areaFrac = (bw * bh) / (w * h)
+  if (areaFrac < 0.02 || areaFrac > 0.75) return null
+  const pad = Math.round(Math.max(bw, bh) * 0.12)
+  const x = Math.max(0, minX - pad)
+  const y = Math.max(0, minY - pad)
+  return { x, y, w: Math.min(w - x, bw + pad * 2), h: Math.min(h - y, bh + pad * 2) }
 }
 
 export async function tokenizeImage(dataUrl: string): Promise<PhotoToken> {
@@ -197,7 +211,7 @@ export function scoreToken(q: PhotoToken, t: PhotoToken): { score: number; phash
   let score: number
   if (q.facePhash && t.facePhash) {
     faceSim = hammingSim(q.facePhash, t.facePhash)
-    score = 0.4 * phashSim + 0.25 * hist + 0.35 * faceSim
+    score = 0.65 * faceSim + 0.1 * phashSim + 0.25 * hist
   } else {
     score = 0.6 * phashSim + 0.4 * hist
   }

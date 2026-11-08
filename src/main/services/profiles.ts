@@ -329,17 +329,28 @@ export class ProfilesService {
 
     const term = (q.search ?? '').trim()
     if (term) {
-      const ftsTerm = term
+      const tokens = term
         .split(/\s+/)
         .map((t) => t.replace(/"/g, '').replace(/[^\w@.-]/g, ''))
         .filter(Boolean)
-        .map((t) => `"${t}"*`)
-        .join(' AND ')
+      const ftsTerm = tokens.map((t) => `"${t}"*`).join(' AND ')
       let ftsIds: string[] | null = null
       if (ftsTerm) {
         try {
           ftsIds = this.db
             .all<{ profile_id: string }>('SELECT profile_id FROM profiles_fts WHERE profiles_fts MATCH ?', [ftsTerm])
+            .map((r) => r.profile_id)
+        } catch {
+          ftsIds = null
+        }
+      }
+      // Strict AND matches nothing: fall back to any-token recall so a
+      // single unrecognized word never zeroes the results.
+      if (ftsIds?.length === 0 && tokens.length > 1) {
+        const orTerm = tokens.map((t) => `"${t}"*`).join(' OR ')
+        try {
+          ftsIds = this.db
+            .all<{ profile_id: string }>('SELECT profile_id FROM profiles_fts WHERE profiles_fts MATCH ?', [orTerm])
             .map((r) => r.profile_id)
         } catch {
           ftsIds = null

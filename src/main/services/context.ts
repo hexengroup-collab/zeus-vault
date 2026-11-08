@@ -140,6 +140,16 @@ export class AppContext {
     this.nlp = new NlpService(db)
     this.profiles!.photoHook = (profileId, imageId, kind) => this.photos!.enqueue(profileId, imageId, kind)
     this.profiles!.photoRemovedHook = (profileId, imageId, kind) => this.photos!.removeToken(profileId, imageId, kind)
+    // Backfill existing vaults so image search works without manual steps.
+    setImmediate(() => {
+      try {
+        if (db.value<number>('SELECT COUNT(*) FROM photo_tokens WHERE status = ? AND phash IS NOT NULL', ['done']) === 0) {
+          this.photos!.enqueueAllProfiles()
+        }
+      } catch {
+        /* token queue is best-effort */
+      }
+    })
     this.transfer = new TransferService(db, this.profiles, this.audit, this.settings, vault.fieldKey, this.paths.exportsDir)
     this.backup = new BackupService(db, this.audit, this.settings, this.paths.backupsDir, () => vault.createEncryptedSnapshot())
     this.b2b = new B2bService(db, this.audit, this.paths.exportsDir)

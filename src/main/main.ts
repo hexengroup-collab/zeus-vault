@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, protocol, shell } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { AppContext } from './services/context'
@@ -24,6 +24,44 @@ if (MCP_SERVE) {
 
 const DEV_URL = process.env.ZEUS_DEV_URL
 const isDev = !!DEV_URL
+
+const distDir = path.join(__dirname, '..', '..', 'dist')
+const MIME: Record<string, string> = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.cjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.wasm': 'application/wasm',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.task': 'application/octet-stream',
+  '.tflite': 'application/octet-stream',
+}
+
+function registerAppProtocol(): void {
+  try {
+    protocol.registerSchemesAsPrivileged([
+      { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, allowServiceWorkers: false } },
+    ])
+    protocol.handle('app', async (req) => {
+      const u = new URL(req.url)
+      const host = u.hostname && u.hostname !== '.' ? `${u.hostname}/` : ''
+      let rel = decodeURIComponent(`${host}${u.pathname}`).replace(/^\/+/, '')
+      if (!rel || rel.endsWith('/')) rel = `${rel}index.html`
+      const file = path.normalize(path.join(distDir, rel))
+      if (!file.startsWith(distDir) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+        return new Response('Not found', { status: 404 })
+      }
+      const data = fs.readFileSync(file)
+      return new Response(data as BodyInit, { status: 200, headers: { 'Content-Type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream' } })
+    })
+  } catch {
+    /* protocol already registered */
+  }
+}
 
 const bootLog = (msg: string, err?: unknown) => {
   try {
@@ -93,8 +131,8 @@ function createWindow(): BrowserWindow {
   if (isDev) {
     void win.loadURL(DEV_URL!)
   } else {
-    bootLog(`loading ${path.join(__dirname, '..', '..', 'dist', 'index.html')}`)
-    void win.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'))
+    bootLog('loading app://./')
+    void win.loadURL('app://./index.html')
   }
   return win
 }
@@ -128,6 +166,7 @@ if (!gotLock) {
   })
 
   app.setAppUserModelId('com.zeusvault.app')
+  registerAppProtocol()
   app.whenReady().then(() => {
     const rootDir = app.getPath('userData')
     fs.mkdirSync(rootDir, { recursive: true })

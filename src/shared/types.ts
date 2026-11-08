@@ -411,6 +411,7 @@ export interface PhotoQueueStatus {
   done: number
   failed: number
   current: string | null
+  lastError: string | null
 }
 
 export interface PhotoMatch {

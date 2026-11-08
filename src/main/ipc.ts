@@ -13,7 +13,7 @@ import type {
   SetupInput,
   Role,
 } from '../shared/types'
-import { extractFields } from './nlp/engine'
+import { extractFields, applyUserAliases } from './nlp/engine'
 import { interpretQuery } from './nlp/query'
 
 type Gate = 'none' | 'session' | 'unlock' | 'standard' | 'admin' | 'readonly'
@@ -208,11 +208,12 @@ export function registerIpc(ctx: AppContext): void {
 
   // ---------------- search & NLP ----------------
   handle('search:query', 'unlock', (payload: { text: string; page?: number; pageSize?: number }) => {
-    const q = String(payload.text ?? '').slice(0, 500)
+    const raw = String(payload.text ?? '').slice(0, 500)
+    const q = applyUserAliases(raw, ctx.nlp!.aliasMap())
     const page = Math.max(1, Number(payload.page) || 1)
     const pageSize = Math.min(250, Math.max(1, Number(payload.pageSize) || 50))
     const result: SearchResults = ctx.search!.search(q, page, pageSize, actorOf())
-    ctx.search!.recordSearch(userIdOf(), 'search', q, { total: result.total, clauses: result.interpretation.clauses.length })
+    ctx.search!.recordSearch(userIdOf(), 'search', raw, { total: result.total, clauses: result.interpretation.clauses.length })
     return result
   })
 
@@ -226,7 +227,7 @@ export function registerIpc(ctx: AppContext): void {
   handle('search:countryStats', 'unlock', () => ctx.search!.countryStats())
 
   handle('nlp:extract', 'unlock', (text: string) => {
-    const result = extractFields(String(text ?? '').slice(0, 4000))
+    const result = extractFields(applyUserAliases(String(text ?? '').slice(0, 4000), ctx.nlp!.aliasMap()))
     ctx.search!.recordSearch(userIdOf(), 'extract', String(text).slice(0, 4000), { fields: result.fields.length })
     return result
   })

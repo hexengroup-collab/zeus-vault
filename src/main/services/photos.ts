@@ -15,6 +15,7 @@ export interface PhotoQueueStatus {
   done: number
   failed: number
   current: string | null
+  lastError: string | null
 }
 
 interface TokenRow {
@@ -106,11 +107,13 @@ export class PhotosService {
   status(actor: Actor): PhotoQueueStatus {
     void actor
     const counts = this.db.all<{ status: string; c: number }>('SELECT status, COUNT(*) c FROM photo_tokens GROUP BY status')
-    const out: PhotoQueueStatus = { queued: 0, processing: 0, done: 0, failed: 0, current: this.currentName }
+    const out: PhotoQueueStatus = { queued: 0, processing: 0, done: 0, failed: 0, current: this.currentName, lastError: null }
     for (const r of counts) {
       const key = String(r.status) as 'queued' | 'processing' | 'done' | 'failed'
       if (key === 'queued' || key === 'processing' || key === 'done' || key === 'failed') out[key] = Number(r.c)
     }
+    const err = this.db.get<{ error: string | null }>(`SELECT error FROM photo_tokens WHERE status='failed' AND error IS NOT NULL ORDER BY updated_at DESC LIMIT 1`)
+    out.lastError = err?.error ?? null
     return out
   }
 

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Camera, FolderOpen, Image as ImageIcon, ScanFace } from 'lucide-react'
 import { call, zeus } from '@/lib/api'
 import { fileToDataUrl } from '@/lib/images'
-import { toastError } from '@/stores/toast'
+import { toastError, toastOk } from '@/stores/toast'
 import { Avatar } from '@/components/Avatar'
 import { defaultAvatar } from '@/lib/format'
 import type { PhotoMatch, PhotoQueueStatus } from '@shared/types'
@@ -114,7 +114,10 @@ export function ImageSearch() {
             className="vault-btn vault-btn-ghost h-10"
             onClick={() =>
               void call(zeus.photos.enqueueAll())
-                .then(() => call(zeus.photos.status()))
+                .then((r) => {
+                  toastOk('Tokenize queued', `${r.queued} photo(s) queued`)
+                  return call(zeus.photos.status())
+                })
                 .then((s) => setQueue(s))
                 .catch((e) => toastError('Tokenize failed', e instanceof Error ? e.message : undefined))
             }
@@ -137,6 +140,11 @@ export function ImageSearch() {
                 style={{ width: `${queue.done + queue.failed === 0 ? 0 : Math.round((queue.done / (queue.done + queue.failed + pending || 1)) * 100)}%` }}
               />
             </div>
+            {queue.lastError && (
+              <div className="mt-2 border border-vault-red/40 bg-vault-red/[0.08] px-2 py-1.5 font-mono text-[9px] text-vault-red">
+                Last tokenize error: {queue.lastError}
+              </div>
+            )}
           </div>
         )}
 
