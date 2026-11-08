@@ -5,7 +5,7 @@
 // batch tokenization never stresses the PC.
 import crypto from 'node:crypto'
 import type { Db } from '../db/sqlite'
-import { tokenizeImage, scoreToken, type PhotoToken, type PhotoMatch } from '../lib/vision'
+import { tokenizeImage, scoreToken, scoreFaceToken, type PhotoToken, type PhotoMatch } from '../lib/vision'
 import { AppError } from '../lib/errors'
 import type { Actor } from './audit'
 
@@ -193,12 +193,14 @@ export class PhotosService {
   async matchFace(cropDataUrl: string): Promise<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]> {
     if (!cropDataUrl) throw new AppError('VALIDATION', 'Provide a face crop.')
     const q = await tokenizeImage(cropDataUrl)
+    // Person matching is FACE-ONLY: background, clothing, and whole-photo
+    // hashes are ignored so unrelated people stop matching.
     const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
     const best = new Map<string, { profileId: string; score: number; phashSim: number; faceSim: number | null }>()
     for (const r of rows) {
       const t = this.rowToToken(r)
       if (!t) continue
-      const s = scoreToken(q, t)
+      const s = scoreFaceToken(q, t)
       const prev = best.get(r.profile_id)
       if (!prev || s.score > prev.score) {
         best.set(r.profile_id, { profileId: r.profile_id, score: s.score, phashSim: s.phashSim, faceSim: s.faceSim })

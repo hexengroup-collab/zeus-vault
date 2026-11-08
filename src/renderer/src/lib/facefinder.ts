@@ -10,13 +10,13 @@ export interface DetectedFace {
 
 let landmarkerPromise: Promise<unknown> | null = null
 
-async function getLandmarker(): Promise<{ landmarker: { detectForImage: (img: HTMLImageElement) => { faceLandmarks: { x: number; y: number }[][] }; close: () => void }; tess: { start: number; end: number }[] }> {
+async function getLandmarker(): Promise<{ landmarker: { detect: (img: HTMLImageElement) => { faceLandmarks: { x: number; y: number }[][] }; close: () => void }; tess: { start: number; end: number }[] }> {
   if (!landmarkerPromise) {
     landmarkerPromise = (async () => {
       const { FilesetResolver, FaceLandmarker } = await import('@mediapipe/tasks-vision')
       const fileset = await FilesetResolver.forVisionTasks(new URL('wasm', document.baseURI).href)
       const modelUrl = new URL('models/face_landmarker.task', document.baseURI).href
-      const buf = await (await fetch(modelUrl)).arrayBuffer()
+      const buf = new Uint8Array(await (await fetch(modelUrl)).arrayBuffer())
       const lm = await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetBuffer: buf },
         runningMode: 'IMAGE',
@@ -59,7 +59,7 @@ export function cropFace(img: HTMLImageElement, box: { x: number; y: number; w: 
 export async function detectPeople(imageSrc: string): Promise<{ faces: DetectedFace[]; tess: { start: number; end: number }[]; width: number; height: number }> {
   const img = await loadImage(imageSrc)
   const { landmarker, tess } = await getLandmarker()
-  const result = landmarker.detectForImage(img) as { faceLandmarks: { x: number; y: number }[][] }
+  const result = landmarker.detect(img) as { faceLandmarks: { x: number; y: number }[][] }
   const faces: DetectedFace[] = []
   for (const lm of result.faceLandmarks ?? []) {
     let minX = Infinity

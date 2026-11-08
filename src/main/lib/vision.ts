@@ -218,6 +218,16 @@ export function scoreToken(q: PhotoToken, t: PhotoToken): { score: number; phash
   return { score: Math.round(score * 1000) / 10, phashSim: Math.round(phashSim * 100), histSim: Math.round(hist * 100), faceSim: faceSim === null ? null : Math.round(faceSim * 100) }
 }
 
+// FACE-ONLY matching: ignore whole-photo signals entirely.
+export function scoreFaceToken(q: PhotoToken, t: PhotoToken): { score: number; phashSim: number; faceSim: number | null } {
+  const phashSim = hammingSim(q.phash, t.phash)
+  if (q.facePhash && t.facePhash) {
+    const faceSim = hammingSim(q.facePhash, t.facePhash)
+    return { score: Math.round(faceSim * 1000) / 10, phashSim: Math.round(phashSim * 100), faceSim: Math.round(faceSim * 100) }
+  }
+  return { score: Math.round(phashSim * 1000) / 10, phashSim: Math.round(phashSim * 100), faceSim: null }
+}
+
 export type FolderPreset = 'vault' | 'documents' | 'desktop' | 'downloads' | 'custom'
 
 const PRESET_DIRS: Record<Exclude<FolderPreset, 'vault' | 'custom'>, string> = {
