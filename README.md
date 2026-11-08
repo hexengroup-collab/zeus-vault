@@ -295,7 +295,7 @@ Prerequisites: Node 20 or newer, npm, Git.
 **Try it locally**
 
 ```powershell
-git clone https://github.com/anomalyco/zeus-vault.git
+git clone https://github.com/hexengroup-collab/zeus-vault.git
 cd zeus-vault
 npm install
 npm run dev
