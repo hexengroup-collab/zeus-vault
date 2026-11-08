@@ -159,16 +159,26 @@ export function Dossier() {
         if (kind === 'attachment') {
           await call(zeus.profiles.addAttachment({ id: d.id, name: file.name, mime: file.type || 'application/octet-stream', dataUrl, category: 'documents' }))
           toastOk('Attachment added', file.name)
+          // Deep tokenize every uploaded image (face + object), not just avatars.
+          try {
+            const { captureDescriptor } = await import('@/lib/facefinder')
+            const desc = await captureDescriptor(dataUrl)
+            if (desc) await call(zeus.photos.saveDesc({ profileId: d.id, desc, kind: 'attachment' }))
+          } catch {
+            /* descriptor capture optional */
+          }
         } else {
           await call(zeus.profiles.addGalleryImage({ id: d.id, name: file.name, dataUrl }))
           toastOk('Image added', file.name)
           // Capture deep face descriptor from the new image (best-effort).
           try {
-            const { captureDescriptor } = await import('@/lib/facefinder')
+            const { captureDescriptor, captureGeometry } = await import('@/lib/facefinder')
             const desc = await captureDescriptor(dataUrl)
             if (desc) await call(zeus.photos.saveDesc({ profileId: d.id, desc, kind: 'gallery' }))
+            const geom = await captureGeometry(dataUrl)
+            if (geom) await call(zeus.photos.saveGeom({ profileId: d.id, geom, kind: 'gallery' }))
           } catch {
-            /* descriptor capture is optional */
+            /* capture optional */
           }
         }
         await reload()

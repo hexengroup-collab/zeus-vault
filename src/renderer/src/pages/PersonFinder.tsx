@@ -183,6 +183,18 @@ export function PersonFinder() {
                     <span role="button" tabIndex={0} className={`font-mono text-[9px] uppercase tracking-[0.18em] ${saveFor === f.index ? 'text-vault-red' : 'text-vault-muted hover:text-vault-text'}`} onClick={() => openPicker(f.index)}>
                       {f.match ? 'Save as reference' : 'Save to dossier'}
                     </span>
+                    {f.match && f.match.score > 0 && (
+                      <span role="button" tabIndex={0} className="border border-vault-green/40 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.15em] text-vault-green" onClick={() => void (async () => {
+                        try {
+                          await call(zeus.photos.saveFace({ profileId: f.match!.profileId, cropDataUrl: f.crop, desc: f.desc ?? undefined, geom: f.geom ?? undefined }))
+                          toastOk('Confirmed & attached', `${f.match!.name} reference updated — matching gets sharper from now`)
+                        } catch (e) {
+                          toastError('Confirm failed', e instanceof Error ? e.message : undefined)
+                        }
+                      })()}>
+                        Confirm identity
+                      </span>
+                    )}
                   </span>
                 </div>
                 {saveFor === f.index && (

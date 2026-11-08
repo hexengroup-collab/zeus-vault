@@ -24,6 +24,7 @@ export function ImageSearch() {
   const [text, setText] = useState('')
   const [qr, setQr] = useState<string | null>(null)
   const [docHits, setDocHits] = useState<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>([])
+  const [compare, setCompare] = useState<{ match: PhotoMatch; candidate: string | null } | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -183,7 +184,7 @@ export function ImageSearch() {
             <FolderOpen size={13} /> Tokenize all photos
           </button>
           <button className="vault-btn vault-btn-ghost h-10" onClick={() => void backfillGeom()} disabled={geomBusy}>
-            <ScanFace size={13} /> {geomBusy ? 'Measuring faces…' : geomDone ? 'Faces measured ✓' : 'Build face geometry (avatars)'}
+            <ScanFace size={13} /> {geomBusy ? 'Measuring faces…' : geomDone ? 'Faces measured ✓' : 'Train faces (all photos)'}
           </button>
         </div>
 
@@ -237,14 +238,14 @@ export function ImageSearch() {
             {matches.map((m) => {
               const p = scores[m.profileId]
               return (
-                <Link key={m.tokenId} to={`/profiles/${m.profileId}`} className="flex items-center gap-3 border border-white/[0.08] bg-white/[0.02] p-3 transition-colors hover:border-vault-red/40">
+                <div key={m.tokenId} className="flex items-center gap-3 border border-white/[0.08] bg-white/[0.02] p-3 transition-colors hover:border-vault-red/40">
                   {m.image ? (
                     <img src={m.image} alt={m.label} className="h-11 w-11 shrink-0 rounded-[3px] object-cover" />
                   ) : (
                     <Avatar src={p?.avatar ?? defaultAvatar(p?.name ?? '?')} name={p?.name ?? '?'} size={44} />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[12px] font-semibold text-vault-text">{p?.name ?? m.profileId}</div>
+                    <Link to={`/profiles/${m.profileId}`} className="block truncate text-[12px] font-semibold text-vault-text hover:underline">{p?.name ?? m.profileId}</Link>
                     <div className="truncate font-mono text-[8px] uppercase tracking-[0.18em] text-vault-muted">
                       {p?.code ?? ''} · {m.label} · {SCORE_LABEL(m.score)}
                       {m.faceDetected ? ' · face data' : ''}
@@ -254,7 +255,8 @@ export function ImageSearch() {
                     <div className="font-mono text-[13px] font-bold text-vault-red">{m.score.toFixed(1)}%</div>
                     <div className="font-mono text-[7px] uppercase tracking-[0.15em] text-vault-muted">phash {m.phashSim} · color {m.histSim}{m.faceSim !== null ? ` · face ${m.faceSim}` : ''}</div>
                   </div>
-                </Link>
+                  <button className="vault-btn !px-2 !py-1 font-mono text-[8px]" onClick={() => { void call(zeus.profiles.get(m.profileId)).then((d) => setCompare({ match: m, candidate: d.avatar ?? m.image ?? null })) }}>COMPARE</button>
+                </div>
               )
             })}
           </div>
@@ -262,6 +264,41 @@ export function ImageSearch() {
       )}
       {matches.length === 0 && !searching && (
         <p className="mt-6 text-center font-mono text-[9px] uppercase tracking-[0.25em] text-vault-muted">No matches yet — drop a photo above</p>
+      )}
+
+      {compare && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-6" onClick={() => setCompare(null)}>
+          <div className="w-full max-w-3xl border border-vault-border bg-[#121419] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="micro-label">Visual verification — side by side</div>
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-vault-muted">Uploaded photo</div>
+                {dataUrl && <img src={dataUrl} alt="Uploaded" className="mt-2 max-h-72 w-full border border-white/10 object-cover" />}
+              </div>
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-vault-muted">Matched record</div>
+                {compare.candidate && <img src={compare.candidate} alt="Candidate" className="mt-2 max-h-72 w-full border border-white/10 object-cover" />}
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <span className="font-mono text-[10px] text-vault-text2">
+                {compare.match.label} · <span className="text-vault-red">{compare.match.score.toFixed(1)}%</span> · confirm to attach this face as training data
+              </span>
+              <span className="flex gap-2">
+                <button className="vault-btn vault-btn-ghost" onClick={() => setCompare(null)}>Close</button>
+                <button className="vault-btn vault-btn-primary" onClick={() => {
+                  if (!dataUrl) return
+                  void call(zeus.photos.saveFace({ profileId: compare.match.profileId, cropDataUrl: dataUrl }))
+                    .then(() => {
+                      toastOk('Confirmed & attached', 'This photo is now a training reference for that profile')
+                      setCompare(null)
+                    })
+                    .catch((e) => toastError('Confirm failed', e instanceof Error ? e.message : undefined))
+                }}>Confirm identity</button>
+              </span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

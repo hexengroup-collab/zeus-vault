@@ -28,12 +28,13 @@ function spreadQuality(lm: { x: number; y: number }[]): number {
 }
 
 // Must match biometricsFromLandmarks in src/main/lib/vision.ts.
-export function faceGeometry(lm: { x: number; y: number }[]): number[] | null {
+export function faceGeometry(lm: { x: number; y: number; z?: number }[]): number[] | null {
   if (!lm || lm.length < 479) return null
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
   const height = dist(lm[10], lm[152])
   if (!Number.isFinite(height) || height < 1e-6) return null
   const eyeMid = { x: (lm[133].x + lm[362].x) / 2, y: (lm[133].y + lm[362].y) / 2 }
+  const dz = (a: { z?: number }, b: { z?: number }) => Math.abs((a.z ?? 0) - (b.z ?? 0)) / height
   const feats = [
     dist(lm[1], lm[152]) / height,
     dist(eyeMid, lm[1]) / height,
@@ -46,8 +47,15 @@ export function faceGeometry(lm: { x: number; y: number }[]): number[] | null {
     dist(lm[356], lm[1]) / height,
     dist(lm[234], lm[454]) / height,
     dist(lm[133], lm[362]) / height,
+    dz(lm[1], lm[10]),
+    dz(lm[1], lm[152]),
   ]
   return feats.map((v) => Math.round(v * 10000) / 10000)
+}
+
+export async function captureGeometry(imageSrc: string): Promise<number[] | null> {
+  const faces = await detectPeople(imageSrc)
+  return faces.length > 0 ? faces[0].geom ?? null : null
 }
 
 interface Landmarker {
@@ -81,8 +89,8 @@ async function getLandmarker(): Promise<Landmarker> {
         baseOptions: { modelAssetBuffer: buf },
         runningMode: 'IMAGE',
         numFaces: 20,
-        minFaceDetectionConfidence: 0.5,
-        minFacePresenceConfidence: 0.5,
+        minFaceDetectionConfidence: 0.3,
+        minFacePresenceConfidence: 0.3,
         outputFacialTransformationMatrixes: false,
         outputFaceBlendshapes: false,
       } as never)
