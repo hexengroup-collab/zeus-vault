@@ -34,7 +34,7 @@ export interface PhotoMatch {
 }
 
 // Descriptor distance with ageitgey-tolerance semantics:
-// descriptors are L2-normalized (distance 0..2); <= 0.6 counts as a match.
+// descriptors are L2-normalized (distance 0..2); <= 0.55 counts as a match.
 export function descriptorDistance(a: number[] | null, b: number[] | null): number | null {
   if (!a || !b || a.length !== b.length || a.length === 0) return null
   let s = 0
@@ -42,7 +42,9 @@ export function descriptorDistance(a: number[] | null, b: number[] | null): numb
   return Math.sqrt(s)
 }
 
-export const DESCRIPTOR_TOLERANCE = 0.6
+export const DESCRIPTOR_TOLERANCE = 0.55
+// The winner must also beat the runner-up by this margin to be an identity.
+export const DESCRIPTOR_MARGIN = 0.1
 
 export function dataUrlToBuffer(dataUrl: string): Buffer {
   const m = /^data:([\w/+.-]+);base64,(.+)$/.exec(dataUrl)

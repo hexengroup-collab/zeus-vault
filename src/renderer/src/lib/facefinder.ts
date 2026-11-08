@@ -5,7 +5,7 @@ import * as tf from '@tensorflow/tfjs'
 import {
   nets,
   detectAllFaces,
-  TinyFaceDetectorOptions,
+  SsdMobilenetv1Options,
 } from '@vladmandic/face-api'
 
 export interface DetectedFace {
@@ -26,7 +26,7 @@ export async function ensureFaceModels(): Promise<boolean> {
       await tf.ready()
       const uri = new URL('models2', document.baseURI).href
       await Promise.all([
-        nets.tinyFaceDetector.loadFromUri(uri),
+        nets.ssdMobilenetv1.loadFromUri(uri),
         nets.faceLandmark68Net.loadFromUri(uri),
         nets.faceRecognitionNet.loadFromUri(uri),
       ])
@@ -61,7 +61,7 @@ function cropFace(img: HTMLImageElement, box: { x: number; y: number; w: number;
 export async function detectPeople(imageSrc: string): Promise<DetectedFace[]> {
   await ensureFaceModels()
   const img = await loadImage(imageSrc)
-  const detections = await detectAllFaces(img, new TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors()
+  const detections = await detectAllFaces(img, new SsdMobilenetv1Options({ minConfidence: 0.5 })).withFaceLandmarks().withFaceDescriptors()
   return detections
     .map((d) => {
       const raw = d as unknown as { box?: { x: number; y: number; width: number; height: number }; detection?: { box: { x: number; y: number; width: number; height: number } }; landmarks?: { positions?: { x: number; y: number }[] }; descriptor?: Array<number> }

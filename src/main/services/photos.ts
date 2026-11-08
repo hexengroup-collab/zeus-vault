@@ -5,7 +5,7 @@
 // batch tokenization never stresses the PC.
 import crypto from 'node:crypto'
 import type { Db } from '../db/sqlite'
-import { tokenizeImage, scoreToken, scoreFaceToken, descriptorDistance, DESCRIPTOR_TOLERANCE, type PhotoToken, type PhotoMatch } from '../lib/vision'
+import { tokenizeImage, scoreToken, scoreFaceToken, descriptorDistance, DESCRIPTOR_TOLERANCE, DESCRIPTOR_MARGIN, type PhotoToken, type PhotoMatch } from '../lib/vision'
 import { AppError } from '../lib/errors'
 import type { Actor } from './audit'
 
@@ -248,6 +248,15 @@ export class PhotosService {
       }
     }
     const ranked = [...best.values()].filter((m) => m.score >= 70).sort((a, b) => b.score - a.score).slice(0, 3)
+    // If the top two are too close together the identity is ambiguous:
+    // downgrade the winner to an uncertain closest, never a named identity.
+    if (ranked.length >= 2 && desc?.length) {
+      const d0 = 1 - ranked[0].score / 100
+      const d1 = 1 - ranked[1].score / 100
+      if (d1 - d0 < DESCRIPTOR_MARGIN) {
+        ranked[0] = { ...ranked[0], score: Math.min(ranked[0].score, 59) }
+      }
+    }
     return ranked.map((m) => {
       const p = this.db.get<{ full_name: string; profile_code: string; avatar_blob: string | null }>('SELECT full_name, profile_code, avatar_blob FROM profiles WHERE id = ?', [m.profileId])
       return { ...m, name: p?.full_name ?? 'Unknown', code: p?.profile_code ?? '', avatar: p?.avatar_blob ?? null }

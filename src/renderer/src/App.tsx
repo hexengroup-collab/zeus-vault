@@ -15,6 +15,16 @@ import { B2bContacts } from '@/pages/B2bContacts'
 import { SearchPage } from '@/pages/Search'
 import { ImageSearch } from '@/pages/ImageSearch'
 import { PersonFinder } from '@/pages/PersonFinder'
+import { detectPeople, captureDescriptor } from '@/lib/facefinder'
+
+declare global {
+  interface Window {
+    __zeusDebug?: { detectPeople: typeof detectPeople; captureDescriptor: typeof captureDescriptor; zeus: typeof zeus }
+  }
+}
+if (typeof window !== 'undefined') {
+  window.__zeusDebug = { detectPeople, captureDescriptor, zeus }
+}
 import { Categories } from '@/pages/Categories'
 import { Countries } from '@/pages/Countries'
 import { Favorites } from '@/pages/Favorites'
