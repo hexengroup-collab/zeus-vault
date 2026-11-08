@@ -227,23 +227,42 @@ export class PhotosService {
       : { phash: '', ahash: '', histogram: [], faceDetected: false, facePhash: null, faceBox: null, faceGeom: null, width: 0, height: 0 }
     if (geom && geom.length) q.faceGeom = geom
     // Descriptor distance (ageitgey semantics): identity is decided here.
+    // A person with several reference photos is matched by centroid.
     const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
-    const best = new Map<string, { profileId: string; score: number; distance: number | null; phashSim: number; faceSim: number | null }>()
+    const byProfile = new Map<string, TokenRow[]>()
     for (const r of rows) {
+      const list = byProfile.get(r.profile_id)
+      if (list) list.push(r)
+      else byProfile.set(r.profile_id, [r])
+    }
+    const centroids = new Map<string, { vec: number[]; base?: TokenRow }>()
+    for (const [pid, list] of byProfile) {
+      const vecs: number[][] = []
+      for (const r of list) {
+        if (!r.face_desc) continue
+        try { vecs.push(JSON.parse(r.face_desc) as number[]) } catch { /* skip */ }
+      }
+      if (!vecs.length) continue
+      const dim = vecs[0].length
+      const mean = new Array<number>(dim).fill(0)
+      for (const v of vecs) for (let i = 0; i < dim; i++) mean[i] += v[i] / vecs.length
+      const norm = Math.sqrt(mean.reduce((a, b) => a + b * b, 0)) || 1
+      centroids.set(pid, { vec: mean.map((x) => x / norm), base: list.find((r) => r.face_desc) ?? list[0] })
+    }
+    const best = new Map<string, { profileId: string; score: number; distance: number | null; phashSim: number; faceSim: number | null }>()
+    for (const [pid, centroid] of centroids) {
+      const base = byProfile.get(pid) ?? []
+      const r = centroid.base
+      if (!r) continue
       const t = this.rowToToken(r)
       if (!t) continue
-      const base = scoreFaceToken(q, t)
-      let arcDesc: number[] | null = null
-      if (r.face_desc) {
-        try { arcDesc = JSON.parse(r.face_desc) as number[] } catch { arcDesc = null }
-      }
-      const d = desc?.length ? descriptorDistance(desc, arcDesc) : null
-      let s = base
+      let s = scoreFaceToken(q, t)
+      const d = desc?.length ? descriptorDistance(desc, centroid.vec) : null
       let distance: number | null = null
       if (desc?.length) {
         if (d === null || d > DESCRIPTOR_TOLERANCE) continue
         distance = d
-        s = { score: Math.round((1 - d) * 1000) / 10, phashSim: base.phashSim, faceSim: Math.round((1 - d) * 50) }
+        s = { score: Math.round((1 - d) * 1000) / 10, phashSim: s.phashSim, faceSim: Math.round((1 - d) * 50) }
       }
       const prev = best.get(r.profile_id)
       if (!prev || s.score > prev.score) {
@@ -303,9 +322,12 @@ export class PhotosService {
     }
   }
 
-  saveDesc(profileId: string, desc: number[], kind: 'avatar' | 'gallery' | 'attachment' = 'avatar'): void {
+  saveDesc(profileId: string, desc: number[], kind: 'avatar' | 'gallery' | 'attachment' = 'avatar', imageId?: string | null): void {
     if (!desc?.length) throw new AppError('VALIDATION', 'Provide a face descriptor.')
-    const r = this.db.get<{ id: string }>('SELECT id FROM photo_tokens WHERE profile_id=? AND status=? AND phash IS NOT NULL ORDER BY (kind=?) DESC, updated_at DESC LIMIT 1', [profileId, 'done', kind])
+    const hasImageScope = kind !== 'avatar' && imageId
+    const r = hasImageScope
+      ? this.db.get<{ id: string }>('SELECT id FROM photo_tokens WHERE profile_id=? AND image_id=? AND status=? AND phash IS NOT NULL LIMIT 1', [profileId, imageId, 'done'])
+      : this.db.get<{ id: string }>('SELECT id FROM photo_tokens WHERE profile_id=? AND status=? AND phash IS NOT NULL ORDER BY (kind=?) DESC, updated_at DESC LIMIT 1', [profileId, 'done', kind])
     if (r?.id) {
       this.db.run('UPDATE photo_tokens SET face_desc=?, face_detected=1, updated_at=? WHERE id=?', [JSON.stringify(desc), new Date().toISOString(), r.id])
     }
