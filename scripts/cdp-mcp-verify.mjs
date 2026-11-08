@@ -1,5 +1,4 @@
 // Enables MCP, generates an API key, and probes the HTTP endpoint.
-const TARGET = 'http://127.0.0.1:9222/zenith'
 async function getTargets() {
   const res = await fetch('http://127.0.0.1:9222/json/list')
   return res.json()
@@ -27,7 +26,6 @@ await evalIn(`location.hash = '#/settings'`)
 await new Promise((r) => setTimeout(r, 1500))
 console.log('enable mcp:', await evalIn('window.zeus.mcp.setEnabled(true).then(r => JSON.stringify(r))'))
 console.log('generate key:', await evalIn('window.zeus.apikeys.generate("integration test").then(r => JSON.stringify(r))'))
-const info = JSON.parse(await evalIn('window.zeus.mcp.getInfo().then(r => JSON.stringify(r))'))
 console.log('info:', (await evalIn('window.zeus.mcp.getInfo().then(r => JSON.stringify(r))')).slice(0, 200))
 
 const genStr = await evalIn('window.zeus.apikeys.generate("integration test 2").then(r => r.ok ? r.result.key : "error " + JSON.stringify(r))')

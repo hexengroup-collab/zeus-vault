@@ -26,6 +26,8 @@
 
 **Overall: SAFE TO PUSH this report-only commit.** The two dependency warnings are pre-existing and do not block a docs-only push. They should be tracked as follow-up maintenance (see §6).
 
+> **Remediation status (updated 2026-11-08):** All three warnings above have since been fixed — see the addendum at the end of this file. Full `npm audit` is now clean (0 vulnerabilities), lint is active, and CI + a pre-push hook are in place.
+
 ---
 
 ## 1. Git state at audit time
@@ -152,3 +154,34 @@ All well under GitHub's 100 MB hard limit; no Git LFS needed. Images/screenshots
 - File added: `PRE_PUSH_AUDIT_REPORT.md` (this file) — **only** file staged/committed.
 - Prior dangling audit drafts (see §1) were never committed and are **not** included.
 - No source, test, config, lockfile, or binary changes. No tag push. No force push.
+
+---
+
+## Addendum — Remediation (2026-11-08)
+
+All three ⚠️ warnings have been fixed:
+
+### §6 → Dependency audit: ✅ CLEAN (0 vulnerabilities, full tree)
+
+| Issue | Fix |
+|---|---|
+| Prod: `uuid <11.1.1` via `exceljs@4.4.0` (moderate) | `overrides: { uuid: ^11.1.1 }` — `exceljs` is already at its latest (`4.4.0`) and pins `uuid ^8.3.0`, so no non-breaking upgrade exists. `uuid@11.1.1` keeps CJS `require('uuid').v4`, which is all `exceljs` uses. Verified: `require('exceljs')` + Workbook smoke test, typecheck, tests, build. `npm audit --omit=dev`: **0 vulnerabilities**. |
+| Dev: `tar` critical via `electron-rebuild` | Removed `electron-rebuild@3.2.9` — deprecated, replaced by `@electron/rebuild` (already present), and unused (no script calls it; its lockfile entry itself warns "Please use @electron/rebuild"). It was the sole source of `tar@6.2.1`. Remaining `tar@7.5.22` (via `@electron/rebuild`/`electron-builder`) is already past the vulnerable range. |
+| Dev: `minimatch` moderate via `electron-builder` | `electron-builder@26.18.0` is already latest yet pins `minimatch ^9/^10` in the vulnerable range. Fixed with scoped overrides: `@electron/universal > minimatch: ^11.0.5`, `app-builder-lib > minimatch: ^11.0.5`, with `@electron/asar > minimatch: ^3.1.5` pinned back (its `glob@7` needs the v3 API; 3.x is outside the vulnerable range). A clean `npm install` re-resolution was required for the overrides to take effect. |
+
+Verified: `npm audit` (full): **found 0 vulnerabilities**. `npm ls minimatch` tree is clean (no `invalid`).
+
+### §10 → CI / hooks / lint: ✅ ADDED
+
+- **CI:** `.github/workflows/ci.yml` — on push/PR to `main`: Node 24, `npm ci`, typecheck, lint, test, build, full `npm audit` (fails on any vulnerability), and a secrets scan over tracked files (private-key/token/credentialed-connection-string patterns). Concurrency cancels superseded runs.
+- **Dependabot:** `.github/dependabot.yml` — weekly npm + GitHub Actions updates (5-PR cap).
+- **Lint:** `oxlint` (`npm run lint`, config `.oxlintrc.json`). Chosen over ESLint because `typescript-eslint@8` requires `typescript <6.1.0` while this repo is on `typescript@7.0.2` (no compatible peer release). Type coverage is already enforced by `tsc` (strict), so oxlint handles syntax/style. First run caught **38 real errors** (dead imports/vars, useless escapes, a dead `?? 'text'` fallback in `profiles.ts`, a ternary-as-statement in `ipc.ts`) — all fixed; remaining findings are warnings-only (style). `npm run lint` exits 0.
+- **Pre-push hook:** `.githooks/pre-push` runs typecheck + lint + test + prod audit. Enabled via `git config core.hooksPath .githooks`, set automatically by `npm run prepare` (`scripts/enable-hooks.mjs`). Bypass for emergencies: `SKIP_HOOKS=1 git push`. Verified locally via Git Bash — passes.
+
+### Re-verification after remediation
+
+- `npm run typecheck` ✅ (exit 0)
+- `npm test` ✅ 2 files, 23 tests
+- `npm run build` ✅ (tsc + Vite renderer + main)
+- `npm run lint` ✅ (0 errors, warnings only)
+- `npm audit` (full) ✅ 0 vulnerabilities

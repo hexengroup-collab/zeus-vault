@@ -17,7 +17,7 @@ export interface ColumnDef {
 
 const PREF_KEY = 'zeus-vault.columns'
 
-export function useColumnVisibility(all: string[]) {
+export function useColumnVisibility(_all: string[]) {
   const [hidden, setHidden] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(PREF_KEY) ?? '[]') as string[]

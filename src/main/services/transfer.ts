@@ -10,7 +10,6 @@ import type { AuditService } from './audit'
 import type { ProfilesService } from './profiles'
 import type { SettingsService } from './settings'
 import { AppError } from '../lib/errors'
-import { decryptField } from '../lib/crypto'
 import { FIELD_ALIASES } from '../nlp/engine'
 import type { ImportPreview, ImportResult, ProfileDetail, ProfileInput, ProfileListItem } from '../../shared/types'
 import { fullAddress } from './profiles'
@@ -250,7 +249,7 @@ export class TransferService {
         } as ProfileListItem
       })
     } else {
-      list = this.profiles.listAllForExport({ ...(opts.filters ?? {}), view: opts.filters?.view ?? 'all-status' }, actor.id ?? '')
+      list = this.profiles.listAllForExport({ ...opts.filters, view: opts.filters?.view ?? 'all-status' }, actor.id ?? '')
     }
 
     const columns = opts.includeSensitive ? [...EXPORT_COLUMNS, { header: 'Password', key: 'password' }] : EXPORT_COLUMNS
@@ -513,7 +512,6 @@ async function buildSummaryPdf(rows: FlatRow[], includeSensitive: boolean): Prom
   })
   y -= 22
   const cols = ['Full Name', 'Username', 'Country', 'City', 'Email', 'Phone']
-  const colX = [margin, margin + 150, margin + 260, margin + 330, margin + 430, margin + 620]
   page.drawText(cols.join('  |  '), { x: margin, y, size: 8.5, font: bold, color: rgb(0.95, 0.95, 0.94) })
   y -= 14
   for (const row of rows) {

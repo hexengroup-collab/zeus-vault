@@ -13,12 +13,6 @@ function startOfDay(d: Date): Date {
   return c
 }
 
-function endOfDay(d: Date): Date {
-  const c = new Date(d)
-  c.setUTCHours(23, 59, 59, 999)
-  return c
-}
-
 function stripSearchWords(text: string): string {
   return text
     .replace(/\b(find|show|list|search|get|give|display|bring|pull|fetch|look up|lookup|all|me|everyone|everybody|profiles?|people|persons?|records?|dossiers?|subjects?|that|which|who|whose|with|have|has|having|having got|are|is|the|a|an|created|updated|edited|modified)\b/gi, ' ')
@@ -114,13 +108,6 @@ export function interpretQuery(rawText: string, opts: { currentUsername?: string
   const clauses: SearchClause[] = []
   const filters: ProfileFilters = {}
   let residual = ` ${lower} `
-  const consume = (re: RegExp, add: (m: RegExpExecArray) => string) => {
-    const m = re.exec(residual)
-    if (m) {
-      add(m)
-      residual = residual.slice(0, m.index) + ' ' + residual.slice(m.index + m[0].length)
-    }
-  }
 
   // View modifiers
   if (/\barchived\b/.test(lower)) {
@@ -249,7 +236,7 @@ export function interpretQuery(rawText: string, opts: { currentUsername?: string
   }
 
   // Industry: explicit phrases or a bare "in <known industry>"
-  const industryPhrase = /\b(?:work(?:s|ing|ed)?\s+in|employed\s+in|industry\s*[:=]?|sector\s*[:=]?)\s+([a-z][a-z \-]{1,40})/.exec(lower)
+  const industryPhrase = /\b(?:work(?:s|ing|ed)?\s+in|employed\s+in|industry\s*[:=]?|sector\s*[:=]?)\s+([a-z][a-z -]{1,40})/.exec(lower)
   if (industryPhrase) {
     const val = normalizeIndustry(industryPhrase[1].trim().replace(/\s+(?:and|with|who|that|from).*$/, ''))
     if (val) {

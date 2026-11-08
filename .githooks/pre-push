@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-push guard — runs the same checks as CI (.github/workflows/ci.yml).
+# Enable with: git config core.hooksPath .githooks   (done automatically by `npm run prepare`)
+# Bypass once (emergencies only): SKIP_HOOKS=1 git push
+set -e
+if [ "${SKIP_HOOKS:-0}" = "1" ]; then
+  echo "pre-push: SKIP_HOOKS=1 — skipping checks"
+  exit 0
+fi
+cd "$(dirname "$0")/.."
+echo "pre-push: typecheck..."
+npm run typecheck --silent
+echo "pre-push: lint..."
+npm run lint --silent
+echo "pre-push: test..."
+npm test --silent
+echo "pre-push: audit (prod)..."
+npm audit --omit=dev
+echo "pre-push: OK"

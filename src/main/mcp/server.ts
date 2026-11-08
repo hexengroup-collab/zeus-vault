@@ -380,7 +380,7 @@ export class McpLayer {
       inputSchema: { idOrCode: z.string() },
     }, async (args) => {
       try {
-        const actor = this.actorWithGate('readonly', principal)
+        this.actorWithGate('readonly', principal)
         const id = this.resolveId(profiles, args.idOrCode)
         return this.text({ id, history: profiles.fieldHistory(id) })
       } catch (e) { return this.err(e) }
@@ -391,7 +391,7 @@ export class McpLayer {
       inputSchema: { idOrCode: z.string() },
     }, async (args) => {
       try {
-        const actor = this.actorWithGate('readonly', principal)
+        this.actorWithGate('readonly', principal)
         const id = this.resolveId(profiles, args.idOrCode)
         return this.text({ id, audit: profiles.profileAudit(id) })
       } catch (e) { return this.err(e) }

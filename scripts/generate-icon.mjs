@@ -59,7 +59,6 @@ function writePng(file, rgba, size) {
 // ---------- Icon drawing ----------
 const lerp = (a, b, t) => a + (b - a) * t
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
-const smooth = (t) => t * t * (3 - 2 * t)
 
 // Lightning bolt polygon in unit coordinates [-1, 1]
 const BOLT = [
@@ -87,7 +86,6 @@ function renderIcon(size) {
   const cx = s / 2
   const cy = s / 2
   const R = s * 0.46 // main orb radius
-  const rim = s * 0.02
   for (let y = 0; y < s; y++) {
     for (let x = 0; x < s; x++) {
       const i = (y * s + x) * 4

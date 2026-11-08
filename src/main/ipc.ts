@@ -7,12 +7,9 @@ import type {
   ApiResult,
   AppInfo,
   AppSettings,
-  AuditEntry,
-  FieldError,
   ProfileFilters,
   ProfileInput,
   SearchResults,
-  SessionUser,
   SetupInput,
   Role,
 } from '../shared/types'
@@ -33,10 +30,6 @@ function fail(e: unknown): ApiResult<never> {
   }
   const message = e instanceof Error ? e.message : String(e)
   return { ok: false, error: { code: 'INTERNAL', message } }
-}
-
-interface HandlerOptions {
-  gate?: Gate
 }
 
 export function registerIpc(ctx: AppContext): void {
@@ -172,7 +165,7 @@ export function registerIpc(ctx: AppContext): void {
   )
 
   handle('profiles:get', 'unlock', (id: string) => {
-    const user = ctx.auth!.requireUser()
+    ctx.auth!.requireUser()
     return ctx.profiles!.get(id, actorOf(), { trackView: true })
   })
 
@@ -265,7 +258,7 @@ export function registerIpc(ctx: AppContext): void {
     to?: string
   }) => {
     const user = ctx.auth!.requireUser()
-    const q = { ...(query ?? {}) }
+    const q = { ...query }
     if (user.role !== 'admin') q.actorId = user.id // standard & readonly users see only their own activity
     return ctx.audit!.list(q)
   })
@@ -435,7 +428,10 @@ export function registerIpc(ctx: AppContext): void {
   })
   handle('window:maximize', 'none', () => {
     const win = BrowserWindow.getFocusedWindow()
-    if (win) win.isMaximized() ? win.unmaximize() : win.maximize()
+    if (win) {
+      if (win.isMaximized()) win.unmaximize()
+      else win.maximize()
+    }
     return { maximized: win ? win.isMaximized() : false }
   })
   handle('window:close', 'none', () => {

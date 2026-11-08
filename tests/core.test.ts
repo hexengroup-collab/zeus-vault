@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { randomBytes } from 'node:crypto'
 import { Db } from '../src/main/db/sqlite'
 import { migrate } from '../src/main/db/schema'

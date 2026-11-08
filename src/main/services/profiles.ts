@@ -11,9 +11,8 @@ import type {
   TagRecord,
   UpdateProfileResult,
 } from '../../shared/types'
-import { AppError, assertFound, validationError } from '../lib/errors'
-import { decryptField, encryptField, generatePassword, passwordStrength, randomHex } from '../lib/crypto'
-import { COUNTRIES } from '../../shared/countries'
+import { AppError, validationError } from '../lib/errors'
+import { decryptField, encryptField } from '../lib/crypto'
 import type { AuditService, Actor } from './audit'
 import type { SettingsService } from './settings'
 
@@ -330,7 +329,7 @@ export class ProfilesService {
     if (term) {
       const ftsTerm = term
         .split(/\s+/)
-        .map((t) => t.replace(/"/g, '').replace(/[^\w@.\-]/g, ''))
+        .map((t) => t.replace(/"/g, '').replace(/[^\w@.-]/g, ''))
         .filter(Boolean)
         .map((t) => `"${t}"*`)
         .join(' AND ')
@@ -473,7 +472,6 @@ export class ProfilesService {
       personalTags = []
     }
 
-    const now = new Date().toISOString()
     const lastView = this.db.get<{ viewed_at: string }>('SELECT viewed_at FROM profile_views WHERE profile_id = ? ORDER BY viewed_at DESC LIMIT 1', [id])
     const isFavorite = !!this.db.value<number>('SELECT 1 FROM favorites WHERE user_id = ? AND profile_id = ?', [actor.id, id])
 
@@ -573,7 +571,7 @@ export class ProfilesService {
             id: String(f.id),
             label: String(f.label),
             value: Number(f.value_enc) === 1 ? decrypt(f.value) : String(f.value ?? ''),
-            type: (String(f.field_type) as CustomField['type']) ?? 'text',
+            type: String(f.field_type ?? 'text') as CustomField['type'],
           }),
         ),
         personalNotes: String(notes.personal_notes ?? ''),

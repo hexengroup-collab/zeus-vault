@@ -9,7 +9,6 @@ fs.mkdirSync(OUT, { recursive: true })
 const CRIMSON = '#E34B64'
 const SILVER = '#A7ADB5'
 const WHITE = '#F1F1F1'
-const DARK = '#171B20'
 
 const sig = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">`
 

@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: typecheck · lint · test · build · audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install (clean, exact)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency audit (full, must be clean)
+        run: npm audit
+
+      - name: Secrets scan (tracked files)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -E --line-number '(-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(live|proj)-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|xox[bpas]-[A-Za-z0-9-]{10,})' -- .; then
+            echo "ERROR: hardcoded credential pattern found in tracked files" >&2
+            exit 1
+          fi
+          if git grep -n -E --line-number '(mongodb\+srv://[^ ]+|postgres(ql)?://[^ ]+:[^ ]+@|mysql://[^ ]+:[^ ]+@|redis://[^ ]+:[^ ]+@)' -- .; then
+            echo "ERROR: credential-bearing connection string found in tracked files" >&2
+            exit 1
+          fi
+          echo "Secrets scan: clean"

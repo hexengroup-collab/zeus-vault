@@ -41,7 +41,6 @@ interface UserRow {
 }
 
 const SESSION_TOUCH_INTERVAL_MS = 60_000
-const LOGIN_BACKOFF_MS = 600
 const MAX_STORED_HISTORY = 200
 
 export class AuthService {

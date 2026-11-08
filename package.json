@@ -16,7 +16,22 @@
     "package": "npm run build && electron-builder --win --dir",
     "dist": "npm run build && electron-builder --win",
     "typecheck": "tsc -b --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "oxlint src tests scripts",
+    "audit": "npm audit --omit=dev",
+    "prepare": "node scripts/enable-hooks.mjs"
+  },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "@electron/universal": {
+      "minimatch": "^11.0.5"
+    },
+    "app-builder-lib": {
+      "minimatch": "^11.0.5"
+    },
+    "@electron/asar": {
+      "minimatch": "^3.1.5"
+    }
   },
   "build": {
     "appId": "com.zeusvault.app",
@@ -74,7 +89,7 @@
     "@vitejs/plugin-react": "^6.2.1",
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
-    "electron-rebuild": "^3.2.9",
+    "oxlint": "^1.92.0",
     "tailwindcss": "^4.3.4",
     "typescript": "^7.0.2",
     "vite": "^8.3.6",

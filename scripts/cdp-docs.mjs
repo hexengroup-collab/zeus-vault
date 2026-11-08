@@ -2,7 +2,6 @@
 import fs from 'node:fs'
 const TARGET = 'http://127.0.0.1:9222'
 const PASS = process.argv[2] ?? ''
-const EXT = process.argv[3] ?? 'pn'
 const OUT = 'D:/zeus-vault/docs/screenshots'
 fs.mkdirSync(OUT, { recursive: true })
 

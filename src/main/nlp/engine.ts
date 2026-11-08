@@ -120,7 +120,7 @@ export function normalizeIndustry(raw: string): string {
   const clean = raw
     .toLowerCase()
     .replace(/\b(the|an|a|industry|sector|domain|field)\b/g, ' ')
-    .replace(/[^a-z &\-]/g, ' ')
+    .replace(/[^a-z &-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
   if (!clean) return ''
@@ -154,7 +154,7 @@ export function extractFields(raw: string): NlpExtractResult {
   const createMatch = /^[\s,]*(?:please\s+)?(?:create|add|new|register|set\s?up|setup|open)\s+(?:a\s+|an\s+|the\s+)?(?:new\s+)?(?:profile|dossier|record|entry)\s*(?:for|of|on)?\s*/i.exec(working)
   if (createMatch) {
     const rest = working.slice(createMatch[0].length)
-    const nameMatch = /^([A-Za-z][A-Za-z'' .\-]{2,60}?)(?=\s*[.,;]|\s+(?:he|she|they|who|is|age|aged|email|phone|username|lives|based|born|from|with|at|works)\b|$)/i.exec(rest)
+    const nameMatch = /^([A-Za-z][A-Za-z'' .-]{2,60}?)(?=\s*[.,;]|\s+(?:he|she|they|who|is|age|aged|email|phone|username|lives|based|born|from|with|at|works)\b|$)/i.exec(rest)
     if (nameMatch) {
       setValue('fullName', 'Full Name', nameMatch[1], 'certain')
       working = rest.slice(Math.min(nameMatch[0].length, rest.length)).replace(/^[\s,.;]+/, '')
@@ -276,8 +276,8 @@ export function extractFields(raw: string): NlpExtractResult {
 
   // Industry phrases: "works in X", "in the X industry", "sector is X", "works at X"
   const industryPhrases = [
-    /(?:in the|into the)\s+([A-Za-z][A-Za-z &\-]{1,40}?)\s+(industry|sector|space|field|domain)\b/i,
-    /(?:works? in|working in|employed in|employed by|industry\s*[:=]|sector\s*[:=]|field of)\s+([A-Za-z][A-Za-z &\-]{1,40}?)(?=$|[,;\n]|\.| and | who | with | at | from )/i,
+    /(?:in the|into the)\s+([A-Za-z][A-Za-z &-]{1,40}?)\s+(industry|sector|space|field|domain)\b/i,
+    /(?:works? in|working in|employed in|employed by|industry\s*[:=]|sector\s*[:=]|field of)\s+([A-Za-z][A-Za-z &-]{1,40}?)(?=$|[,;\n]|\.| and | who | with | at | from )/i,
   ]
   for (const re of industryPhrases) {
     const m = re.exec(working)

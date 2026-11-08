@@ -41,7 +41,7 @@ export class B2bService {
     private exportsDir: string,
   ) {}
 
-  list(query: B2bListQuery, userId: string): Paginated<B2bContact> {
+  list(query: B2bListQuery, _userId: string): Paginated<B2bContact> {
     const where: string[] = ['deleted_at IS NULL']
     const params: Param[] = []
     if (query.status && query.status !== 'all') {
