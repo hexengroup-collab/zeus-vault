@@ -10,7 +10,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.0.0-e34b64?style=for-the-badge)](.)
+[![Version](https://img.shields.io/badge/version-1.1.0-e34b64?style=for-the-badge)](.)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-critical?style=for-the-badge)](.)
 [![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM-d97757?style=for-the-badge)](#security-model)
 [![Hashing](https://img.shields.io/badge/hashing-Argon2id-d97757?style=for-the-badge)](#security-model)
@@ -67,6 +67,16 @@ A private encrypted dossier workstation for the desktop. Every profile is a stru
 | Telemetry | Zero — every byte stays on the machine, verified in Security Center | Ad-supported / cloud-locked |
 
 **The manager that understands faces, documents, and plain language — and proves it with hashes.**
+
+---
+
+## Five Ways to Find Anything
+
+- **Text + NLP** — natural-language queries with alias translation and tolerant recall.
+- **Semantic** — TF-IDF local embeddings rank by meaning, not keywords.
+- **Documents (OCR)** — image attachments are read offline; searchable by their visible text.
+- **Photos** — perceptual tokens match objects, scenes, and anything in the archive.
+- **Person Finder** — MediaPipe detection + deep face descriptors (face-api) measured on-device; identity verdicts only when tolerance *and* winning margin agree.
 
 ---
 
@@ -280,7 +290,7 @@ Each box maps to a real subsystem in `src/main`:
 
 ### Use the standalone installer
 
-A packaged Windows (or Linux) build ships with the release artifacts: `release/ZeusVault-1.0.0-Setup.exe`.
+A packaged Windows (or Linux) build ships with the release artifacts: `release/ZeusVault-1.1.0-Setup.exe`.
 
 1. Run the installer.
 2. The wizard lets you change the installation directory (default: `%LOCALAPPDATA%\Programs\Zeus Vault`), choose Desktop and Start Menu shortcuts, then press Install.

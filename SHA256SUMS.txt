@@ -1,1 +1,1 @@
-﻿ZeusVault-1.0.0-Setup.exe  108442a2760ea25f20992df0cec921f9ea9e6acafaf900eef641e5c4d5d3cf41
+﻿ZeusVault-1.1.0-Setup.exe  fd54984f76a9d5bb9bc991c7acf1745190617310dfb3b9c07c92b0c28e341227

@@ -1,7 +1,7 @@
 {
   "name": "zeus-vault",
   "productName": "Zeus Vault",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zeus Vault - Encrypted Desktop Profile Management and Intelligence Archive",
   "author": "Zeus Vault",
   "license": "MIT",
@@ -44,9 +44,19 @@
     "files": [
       "dist/**",
       "dist-electron/**",
-      "node_modules/**",
       "resources/**",
-      "package.json"
+      "package.json",
+      "node_modules/exceljs/**",
+      "node_modules/pdf-lib/**",
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/better-sqlite3/**",
+      "node_modules/tesseract.js/**",
+      "node_modules/tesseract.js-core/**",
+      "node_modules/dayjs/**",
+      "node_modules/fast-csv/**",
+      "node_modules/saxes/**",
+      "node_modules/archiver/**"
     ],
     "win": {
       "target": [
