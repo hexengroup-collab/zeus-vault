@@ -1,0 +1,11 @@
+# Security-sensitive paths — every change here needs owner review.
+* @ohidur4
+/.github/ @ohidur4
+/src/main/ @ohidur4
+/src/preload/ @ohidur4
+/src/main/ipc.ts @ohidur4
+/src/main/lib/crypto.ts @ohidur4
+/src/main/services/auth.ts @ohidur4
+/src/main/services/vault.ts @ohidur4
+/package.json @ohidur4
+/package-lock.json @ohidur4

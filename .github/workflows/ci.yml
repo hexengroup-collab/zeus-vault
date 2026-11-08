@@ -57,3 +57,77 @@ jobs:
             exit 1
           fi
           echo "Secrets scan: clean"
+
+  security:
+    # Security gate - fails the workflow (and blocks merge when required)
+    # on high/critical vulnerabilities, static analysis findings, or secrets.
+    name: security gate · audit · codeql · secrets · keylogger
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install (clean, exact)
+        run: npm ci
+
+      - name: Dependency audit gate (fail on high/critical)
+        run: npm audit --audit-level=high
+
+      - name: Full audit (must be clean)
+        run: npm audit
+
+      - name: Secrets scan (tracked files)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -E --line-number '(-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(live|proj)-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|xox[bpas]-[A-Za-z0-9-]{10,})' -- .; then
+            echo "ERROR: hardcoded credential pattern found in tracked files" >&2
+            exit 1
+          fi
+          if git grep -n -E --line-number '(mongodb\+srv://[^ ]+|postgres(ql)?://[^ ]+:[^ ]+@|mysql://[^ ]+:[^ ]+@|redis://[^ ]+:[^ ]+@)' -- .; then
+            echo "ERROR: credential-bearing connection string found in tracked files" >&2
+            exit 1
+          fi
+          echo "Secrets scan: clean"
+
+      - name: Anti-keylogger gate (keyboard capture must never exfiltrate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== document-level keyboard capture (must be empty) ==="
+          git grep -n -E "document\.addEventListener\(['\"](keydown|keypress|keyup)" -- ':!src/renderer/public/*' && { echo "ERROR: document-level keyboard capture detected" >&2; exit 1; }
+          echo "=== key capture + network primitives in the same file (must be empty) ==="
+          for f in $(git grep -l -E "(window|document)\.addEventListener\(['\"](keydown|keypress|keyup)" -- ':!src/renderer/public/*' || true); do
+            if grep -q -E "fetch\(|XMLHttpRequest|WebSocket|sendBeacon|http\.request|net\.connect" "$f"; then
+              echo "ERROR: keyboard capture combined with networking in $f" >&2
+              grep -n -E "(addEventListener\(['\"](keydown|keypress|keyup)|fetch\(|XMLHttpRequest|WebSocket|sendBeacon)" "$f" >&2
+              exit 1
+            fi
+          done
+          echo "Keylogger gate: clean"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          category: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze (CodeQL)
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: security-and-quality
