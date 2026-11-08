@@ -284,6 +284,22 @@ export function cosineSim(a: number[] | null, b: number[] | null): number | null
   return dot / (Math.sqrt(na) * Math.sqrt(nb))
 }
 
+export const PROFILE_DISTANCE_LIMIT = 0.8
+export const GEOMETRY_CORROBORATION = 0.55
+// Partial faces (50-60% visible) get a wider, stricter band.
+export const PARTIAL_DISTANCE_LIMIT = 0.85
+export const PARTIAL_MARGIN = 0.2
+
+export function qualityOf(lm: { x: number; y: number }[] | null): number {
+  if (!lm?.length) return 0
+  const xs = lm.map((p) => p.x)
+  const ys = lm.map((p) => p.y)
+  const spreadX = Math.max(...xs) - Math.min(...xs)
+  const spreadY = Math.max(...ys) - Math.min(...ys)
+  if (spreadX < 1e-4 || spreadY < 1e-4) return 0
+  return spreadX / spreadY
+}
+
 export type FolderPreset = 'vault' | 'documents' | 'desktop' | 'downloads' | 'custom'
 
 const PRESET_DIRS: Record<Exclude<FolderPreset, 'vault' | 'custom'>, string> = {

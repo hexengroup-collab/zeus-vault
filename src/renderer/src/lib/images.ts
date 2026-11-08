@@ -40,6 +40,26 @@ export function cropSquareDataUrl(img: HTMLImageElement, size: number): string {
   return canvas.toDataURL('image/jpeg', 0.85)
 }
 
+export async function decodeQr(imageSrc: string): Promise<string | null> {
+  const { default: jsQR } = await import('jsqr')
+  const img = new Image()
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('Image failed to load'))
+    img.src = imageSrc
+  })
+  const canvas = document.createElement('canvas')
+  const scale = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight))
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const code = jsQR(data.data, data.width, data.height)
+  return code?.data ?? null
+}
+
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()

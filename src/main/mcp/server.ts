@@ -567,6 +567,50 @@ export class McpLayer {
       } catch (e) { return this.err(e) }
     })
 
+    server.registerTool('photos_image_search', {
+      description: 'Visual search: match an image (data URL) against archived photo tokens (objects, scenes, attachments, gallery - not avatars by default). Optionally narrow by status and text filters.',
+      inputSchema: {
+        dataUrl: z.string().min(10),
+        kinds: z.array(z.enum(['avatar', 'gallery', 'attachment'])).optional(),
+        text: z.string().optional(),
+      },
+    }, async (args) => {
+      try {
+        this.actorWithGate('readonly', principal)
+        return this.text(await ctx.photos!.search(args.dataUrl, { kinds: args.kinds, text: args.text }))
+      } catch (e) { return this.err(e) }
+    })
+
+    server.registerTool('photos_match_face', {
+      description: 'Person identification: identify a face crop in the archive. Provide dataUrl for a face crop, plus deep descriptor (128 floats from face-api) and optional geometry for strongest results. Returns ranked identity candidates with distance.',
+      inputSchema: {
+        dataUrl: z.string().min(10),
+        descriptor: z.array(z.number()).optional(),
+        geometry: z.array(z.number()).optional(),
+      },
+    }, async (args) => {
+      try {
+        this.actorWithGate('readonly', principal)
+        return this.text(await ctx.photos!.matchFace(args.dataUrl, args.geometry ?? null, args.descriptor ?? null))
+      } catch (e) { return this.err(e) }
+    })
+
+    server.registerTool('photos_bind_face', {
+      description: 'Bind a face to a dossier: save a face crop as an official reference under the profile (stores its token and optional descriptor/geometry). After binding, that person matches in future scans.',
+      inputSchema: {
+        profileId: z.string().min(1),
+        dataUrl: z.string().min(10),
+        descriptor: z.array(z.number()).optional(),
+        geometry: z.array(z.number()).optional(),
+      },
+    }, async (args) => {
+      try {
+        const actor = this.actorWithGate('standard', principal)
+        ctx.profiles!.get(args.profileId, actor, { trackView: false })
+        return this.text(await ctx.photos!.saveFace(args.profileId, args.dataUrl, args.geometry ?? null, args.descriptor ?? null))
+      } catch (e) { return this.err(e) }
+    })
+
     return server
   }
 

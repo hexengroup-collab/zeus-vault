@@ -5,7 +5,7 @@
 // batch tokenization never stresses the PC.
 import crypto from 'node:crypto'
 import type { Db } from '../db/sqlite'
-import { tokenizeImage, scoreToken, scoreFaceToken, descriptorDistance, DESCRIPTOR_TOLERANCE, DESCRIPTOR_MARGIN, type PhotoToken, type PhotoMatch } from '../lib/vision'
+import { tokenizeImage, scoreToken, scoreFaceToken, descriptorDistance, cosineSim, DESCRIPTOR_TOLERANCE, DESCRIPTOR_MARGIN, PROFILE_DISTANCE_LIMIT, GEOMETRY_CORROBORATION, PARTIAL_DISTANCE_LIMIT, PARTIAL_MARGIN, type PhotoToken, type PhotoMatch } from '../lib/vision'
 import { AppError } from '../lib/errors'
 import type { Actor } from './audit'
 
@@ -199,7 +199,7 @@ export class PhotosService {
     return { label: r.kind, image: null }
   }
 
-  async search(queryDataUrl: string, filters: { view?: string; categoryId?: string; country?: string; text?: string; minScore?: number } = {}): Promise<{ query: PhotoToken['phash']; faceDetected: boolean; matches: PhotoMatch[] }> {
+  async search(queryDataUrl: string, filters: { view?: string; categoryId?: string; country?: string; text?: string; minScore?: number; kinds?: ('avatar' | 'gallery' | 'attachment')[] } = {}): Promise<{ query: PhotoToken['phash']; faceDetected: boolean; matches: PhotoMatch[] }> {
     if (!queryDataUrl) throw new AppError('VALIDATION', 'Provide a query image.')
     const allowed = this.allowedProfileIds(filters)
     const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
@@ -220,48 +220,66 @@ export class PhotosService {
     return { query: query.phash, faceDetected: query.faceDetected, matches: matches.filter((m) => m.score >= cutoff).slice(0, 12) }
   }
 
-  async matchFace(cropDataUrl: string, geom: number[] | null = null, desc: number[] | null = null): Promise<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]> {
+  async matchFace(cropDataUrl: string, geom: number[] | null = null, desc: number[] | null = null, quality = 1): Promise<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]> {
     if (!cropDataUrl && !desc?.length) throw new AppError('VALIDATION', 'Provide a face crop.')
     const q: Awaited<ReturnType<typeof tokenizeImage>> = cropDataUrl
       ? await tokenizeImage(cropDataUrl)
       : { phash: '', ahash: '', histogram: [], faceDetected: false, facePhash: null, faceBox: null, faceGeom: null, width: 0, height: 0 }
     if (geom && geom.length) q.faceGeom = geom
     // Descriptor distance (ageitgey semantics): identity is decided here.
-    // A person with several reference photos is matched by centroid.
+    // Every reference photo is its own likeness; a person matches when ANY
+    // reference is close (handles aging: old and young views coexist).
     const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
-    const byProfile = new Map<string, TokenRow[]>()
+    const refDescs = new Map<string, { vec: number[]; row: TokenRow }[]>()
     for (const r of rows) {
-      const list = byProfile.get(r.profile_id)
-      if (list) list.push(r)
-      else byProfile.set(r.profile_id, [r])
+      if (!r.face_desc) continue
+      try {
+        const vec = JSON.parse(r.face_desc) as number[]
+        const list = refDescs.get(r.profile_id)
+        if (list) list.push({ vec, row: r })
+        else refDescs.set(r.profile_id, [{ vec, row: r }])
+      } catch { /* skip */ }
     }
-    const centroids = new Map<string, { vec: number[]; base?: TokenRow }>()
-    for (const [pid, list] of byProfile) {
-      const vecs: number[][] = []
-      for (const r of list) {
-        if (!r.face_desc) continue
-        try { vecs.push(JSON.parse(r.face_desc) as number[]) } catch { /* skip */ }
-      }
-      if (!vecs.length) continue
-      const dim = vecs[0].length
-      const mean = Array.from({ length: dim }, () => 0)
-      for (const v of vecs) for (let i = 0; i < dim; i++) mean[i] += v[i] / vecs.length
-      const norm = Math.sqrt(mean.reduce((a, b) => a + b * b, 0)) || 1
-      centroids.set(pid, { vec: mean.map((x) => x / norm), base: list.find((r) => r.face_desc) ?? list[0] })
+    const geomCentroids = new Map<string, number[]>()
+    for (const r of rows) {
+      if (!r.face_geom) continue
+      try {
+        const v = JSON.parse(r.face_geom) as number[]
+        const list = geomCentroids.get(r.profile_id)
+        if (!list) geomCentroids.set(r.profile_id, v)
+      } catch { /* skip */ }
     }
     const best = new Map<string, { profileId: string; score: number; distance: number | null; phashSim: number; faceSim: number | null }>()
-    const descriptorMode = desc?.length && centroids.size > 0
-    const matchRows = descriptorMode ? [...centroids.values()].map((c) => ({ pid: c.base!.profile_id, c })) : rows.map((r) => ({ pid: r.profile_id, c: null as null }))
-    for (const { pid, c } of matchRows) {
-      const r = c?.base ?? rows.find((row) => row.profile_id === pid)
-      if (!r) continue
+    const descriptorMode = desc?.length && refDescs.size > 0
+    if (!descriptorMode) {
+      for (const r of rows) {
+        const t = this.rowToToken(r)
+        if (!t) continue
+        const s = scoreFaceToken(q, t)
+        const prev = best.get(r.profile_id)
+        if (!prev || s.score > prev.score) {
+          best.set(r.profile_id, { profileId: r.profile_id, score: s.score, distance: null, phashSim: s.phashSim, faceSim: s.faceSim })
+        }
+      }
+    }
+    for (const [pid, refs] of refDescs) {
+      const r = refs[0].row
       const t = this.rowToToken(r)
       if (!t) continue
       let s = scoreFaceToken(q, t)
       let distance: number | null = null
-      if (descriptorMode && c) {
-        const d = descriptorDistance(desc!, c.vec)
-        if (d === null || d > DESCRIPTOR_TOLERANCE) continue
+      if (descriptorMode) {
+        const distances = refs.map((ref) => descriptorDistance(desc!, ref.vec)).filter((d): d is number => d !== null)
+        if (!distances.length) continue
+        const d = Math.min(...distances)
+        const goodFace = quality > 0.7
+        const limit = goodFace ? DESCRIPTOR_TOLERANCE : PARTIAL_DISTANCE_LIMIT
+        let accepted = d <= limit
+        if (!accepted && d <= PROFILE_DISTANCE_LIMIT && geom?.length) {
+          const g = cosineSim(geom, geomCentroids.get(pid) ?? null)
+          accepted = g !== null && g >= GEOMETRY_CORROBORATION
+        }
+        if (!accepted) continue
         distance = d
         s = { score: Math.round((1 - d) * 1000) / 10, phashSim: s.phashSim, faceSim: Math.round((1 - d) * 50) }
       }
@@ -270,13 +288,17 @@ export class PhotosService {
         best.set(pid, { profileId: pid, score: s.score, distance, phashSim: s.phashSim, faceSim: s.faceSim })
       }
     }
-    const ranked = [...best.values()].filter((m) => m.score >= 70).sort((a, b) => b.score - a.score).slice(0, 3)
+    const ranked = [...best.values()]
+      .filter((m) => m.score >= 70 || (m.distance !== null && m.distance <= PROFILE_DISTANCE_LIMIT))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
     // If the top two are too close together the identity is ambiguous:
     // downgrade the winner to an uncertain closest, never a named identity.
     if (ranked.length >= 2 && desc?.length) {
       const d0 = 1 - ranked[0].score / 100
       const d1 = 1 - ranked[1].score / 100
-      if (d1 - d0 < DESCRIPTOR_MARGIN) {
+      const need = quality > 0.7 ? DESCRIPTOR_MARGIN : PARTIAL_MARGIN
+      if (d1 - d0 < need) {
         ranked[0] = { ...ranked[0], score: Math.min(ranked[0].score, 59) }
       }
     }

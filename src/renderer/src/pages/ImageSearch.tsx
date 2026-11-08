@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Camera, FolderOpen, Image as ImageIcon, ScanFace } from 'lucide-react'
+import { Camera, FolderOpen, Image as ImageIcon, QrCode, ScanFace } from 'lucide-react'
 import { call, zeus } from '@/lib/api'
-import { fileToDataUrl } from '@/lib/images'
+import { decodeQr, fileToDataUrl } from '@/lib/images'
 import { toastError, toastOk } from '@/stores/toast'
 import { Avatar } from '@/components/Avatar'
 import { defaultAvatar } from '@/lib/format'
@@ -22,6 +22,8 @@ export function ImageSearch() {
   const [queue, setQueue] = useState<PhotoQueueStatus | null>(null)
   const [view, setView] = useState('all-status')
   const [text, setText] = useState('')
+  const [qr, setQr] = useState<string | null>(null)
+  const [docHits, setDocHits] = useState<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>([])
 
   useEffect(() => {
     let alive = true
@@ -69,6 +71,19 @@ export function ImageSearch() {
       setPreview(URL.createObjectURL(file))
       setDataUrl(url)
       await runSearch(url)
+      // QR decode: show payload + search documents for it.
+      try {
+        const payload = await decodeQr(url)
+        setQr(payload)
+        if (payload) {
+          const hits = await call(zeus.photos.docSearch(payload.slice(0, 120)))
+          setDocHits(hits)
+        } else {
+          setDocHits([])
+        }
+      } catch {
+        setQr(null)
+      }
     } catch (e) {
       toastError('Image search failed', e instanceof Error ? e.message : undefined)
     }
@@ -197,6 +212,20 @@ export function ImageSearch() {
         {faceDetected && (
           <div className="mt-3 flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.18em] text-vault-text2">
             <Camera size={12} /> Face region detected in query — face token used in scoring
+          </div>
+        )}
+        {qr && (
+          <div className="mt-3 border border-vault-amber/40 bg-vault-amber/[0.06] p-3">
+            <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.18em] text-vault-amber"><QrCode size={12} /> QR decoded</div>
+            <div className="mt-1 break-all font-mono text-[10px] leading-relaxed text-vault-text">{qr.slice(0, 300)}</div>
+            {docHits.length > 0 && (
+              <div className="mt-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-vault-muted">Documents mentioning this code</div>
+                {docHits.map((d) => (
+                  <a key={d.attachmentId} href={`#/profiles/${d.profileId}`} className="mt-1 block font-mono text-[9px] text-vault-text2 hover:text-vault-text">{d.name} — {d.snippet.slice(0, 90)}</a>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

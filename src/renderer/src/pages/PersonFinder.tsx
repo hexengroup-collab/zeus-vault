@@ -80,7 +80,7 @@ export function PersonFinder() {
       const withMatch = await Promise.all(
         detected.map(async (f) => {
           try {
-            const hits = await call(zeus.photos.matchFace({ cropDataUrl: f.crop, geom: undefined, desc: f.desc ?? undefined }))
+            const hits = await call(zeus.photos.matchFace({ cropDataUrl: f.crop, geom: f.geom ?? undefined, desc: f.desc ?? undefined, quality: f.quality }))
             const best = hits[0]
             return best ? { ...f, match: { profileId: best.profileId, score: best.score, distance: best.distance, name: best.name, code: best.code } } : f
           } catch {

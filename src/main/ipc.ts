@@ -250,13 +250,13 @@ export function registerIpc(ctx: AppContext): void {
 
   handle('photos:status', 'unlock', () => ctx.photos!.status({ ...actorOf(), userId: userIdOf() } as never))
   handle('photos:enqueueAll', 'standard', () => ctx.photos!.enqueueAllProfiles())
-  handle('photos:search', 'unlock', (payload: { dataUrl: string; view?: string; categoryId?: string; country?: string; text?: string; minScore?: number }) => ctx.photos!.search(String(payload.dataUrl ?? ''), { view: payload.view, categoryId: payload.categoryId, country: payload.country, text: payload.text, minScore: payload.minScore }))
+  handle('photos:search', 'unlock', (payload: { dataUrl: string; view?: string; categoryId?: string; country?: string; text?: string; minScore?: number; kinds?: ('avatar' | 'gallery' | 'attachment')[] }) => ctx.photos!.search(String(payload.dataUrl ?? ''), { view: payload.view, categoryId: payload.categoryId, country: payload.country, text: payload.text, minScore: payload.minScore, kinds: payload.kinds }))
   handle('photos:recheck', 'unlock', (profileId: string) => ctx.photos!.recheck(String(profileId ?? '')))
   handle('photos:profile', 'unlock', (profileId: string) => ctx.photos!.profileTokens(String(profileId ?? '')))
   handle('photos:saveFace', 'standard', (payload: { profileId: string; cropDataUrl: string; geom?: number[]; desc?: number[] }) => ctx.photos!.saveFace(String(payload.profileId ?? ''), String(payload.cropDataUrl ?? ''), Array.isArray(payload.geom) ? payload.geom : null, Array.isArray(payload.desc) ? payload.desc : null))
-  handle('photos:matchFace', 'unlock', (payload: { cropDataUrl?: string; geom?: number[]; desc?: number[] } | string) => {
+  handle('photos:matchFace', 'unlock', (payload: { cropDataUrl?: string; geom?: number[]; desc?: number[]; quality?: number } | string) => {
     if (typeof payload === 'string') return ctx.photos!.matchFace(payload)
-    return ctx.photos!.matchFace(String(payload.cropDataUrl ?? ''), Array.isArray(payload.geom) ? payload.geom : null, Array.isArray(payload.desc) ? payload.desc : null)
+    return ctx.photos!.matchFace(String(payload.cropDataUrl ?? ''), Array.isArray(payload.geom) ? payload.geom : null, Array.isArray(payload.desc) ? payload.desc : null, typeof payload.quality === 'number' ? payload.quality : 1)
   })
   handle('photos:saveGeom', 'standard', (payload: { profileId: string; geom: number[]; kind?: 'avatar' | 'gallery' | 'attachment' }) => {
     ctx.photos!.saveGeom(String(payload.profileId ?? ''), payload.geom, payload.kind ?? 'avatar')
