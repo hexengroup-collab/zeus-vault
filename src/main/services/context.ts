@@ -13,6 +13,7 @@ import { UsersService } from './users'
 import { CategoriesService } from './categories'
 import { SearchService } from './search'
 import { PhotosService } from './photos'
+import { DocsService } from './docs'
 import { NlpService } from './nlp'
 import { TransferService } from './transfer'
 import { BackupService } from './backup'
@@ -40,6 +41,7 @@ export interface VaultContext {
   categories: CategoriesService | null
   search: SearchService | null
   photos: PhotosService | null
+  docs: DocsService | null
   nlp: NlpService | null
   transfer: TransferService | null
   backup: BackupService | null
@@ -63,6 +65,7 @@ export class AppContext {
   categories: CategoriesService | null = null
   search: SearchService | null = null
   photos: PhotosService | null = null
+  docs: DocsService | null = null
   nlp: NlpService | null = null
   transfer: TransferService | null = null
   backup: BackupService | null = null
@@ -137,9 +140,11 @@ export class AppContext {
     this.categories = new CategoriesService(db, this.audit)
     this.search = new SearchService(db, this.profiles)
     this.photos = new PhotosService(db)
+    this.docs = new DocsService(db)
     this.nlp = new NlpService(db)
     this.profiles!.photoHook = (profileId, imageId, kind) => this.photos!.enqueue(profileId, imageId, kind)
     this.profiles!.photoRemovedHook = (profileId, imageId, kind) => this.photos!.removeToken(profileId, imageId, kind)
+    this.profiles!.ocrHook = (attachmentId, profileId) => this.docs!.enqueue(attachmentId, profileId)
     // Backfill existing vaults so image search works without manual steps.
     setImmediate(() => {
       try {

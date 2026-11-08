@@ -22,12 +22,14 @@ export interface PhotoToken {
 export interface PhotoMatch {
   tokenId: string
   profileId: string
-  kind: 'avatar' | 'gallery'
+  kind: 'avatar' | 'gallery' | 'attachment'
   score: number
   phashSim: number
   histSim: number
   faceSim: number | null
   faceDetected: boolean
+  label?: string
+  image?: string | null
 }
 
 export function dataUrlToBuffer(dataUrl: string): Buffer {
@@ -131,10 +133,13 @@ function findFaceLikeRegion(rgb: Uint8Array, w: number, h: number): { x: number;
   if (bw < 4 || bh < 4) return null
   const areaFrac = (bw * bh) / (w * h)
   if (areaFrac < 0.02 || areaFrac > 0.75) return null
-  const pad = Math.round(Math.max(bw, bh) * 0.12)
-  const x = Math.max(0, minX - pad)
-  const y = Math.max(0, minY - pad)
-  return { x, y, w: Math.min(w - x, bw + pad * 2), h: Math.min(h - y, bh + pad * 2) }
+  // Tight crop: wide/tall boxes pull in background and kill precision.
+  const side = Math.max(bw, bh)
+  const cx = (minX + maxX) / 2
+  const cy = (minY + maxY) / 2
+  const x = Math.round(Math.max(0, Math.min(w - side, cx - side / 2)))
+  const y = Math.round(Math.max(0, Math.min(h - side, cy - side / 2)))
+  return { x, y, w: side, h: side }
 }
 
 export async function tokenizeImage(dataUrl: string): Promise<PhotoToken> {

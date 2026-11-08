@@ -417,12 +417,14 @@ export interface PhotoQueueStatus {
 export interface PhotoMatch {
   tokenId: string
   profileId: string
-  kind: 'avatar' | 'gallery'
+  kind: 'avatar' | 'gallery' | 'attachment'
   score: number
   phashSim: number
   histSim: number
   faceSim: number | null
   faceDetected: boolean
+  label: string
+  image: string | null
 }
 
 export interface NlpAlias {

@@ -89,8 +89,9 @@ export interface ProfileActor extends Actor {
 }
 
 export class ProfilesService {
-  photoHook?: (profileId: string, imageId: string | null, kind: 'avatar' | 'gallery') => void
-  photoRemovedHook?: (profileId: string, imageId: string | null, kind: 'avatar' | 'gallery') => void
+  photoHook?: (profileId: string, imageId: string | null, kind: 'avatar' | 'gallery' | 'attachment') => void
+  photoRemovedHook?: (profileId: string, imageId: string | null, kind: 'avatar' | 'gallery' | 'attachment') => void
+  ocrHook?: (attachmentId: string, profileId: string) => void
   constructor(
     private db: Db,
     private audit: AuditService,
@@ -1086,6 +1087,10 @@ export class ProfilesService {
       attId, id, category.slice(0, 60) || 'documents', name.slice(0, 200) || 'file', mime.slice(0, 120), check.bytes, dataUrl, actor.username, actor.id, new Date().toISOString(),
     ])
     this.audit.record(actor, { eventType: 'ATTACHMENT_ADDED', targetType: 'profile', targetId: id, targetLabel: p.full_name, detail: `Attachment ${name}` })
+    if (/^image\/(jpeg|png|webp)$/.test(mime)) {
+      this.photoHook?.(id, attId, 'attachment')
+      this.ocrHook?.(attId, id)
+    }
     return attId
   }
 

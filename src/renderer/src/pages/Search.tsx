@@ -26,8 +26,10 @@ export function SearchPage() {
   const [result, setResult] = useState<SearchResults | null>(null)
   const [searching, setSearching] = useState(false)
   const [page, setPage] = useState(1)
-  const [mode, setMode] = useState<'text' | 'semantic'>('text')
+  const [mode, setMode] = useState<'text' | 'semantic' | 'documents'>('text')
   const [semantic, setSemantic] = useState<{ profileId: string; score: number }[]>([])
+  const [docs, setDocs] = useState<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>([])
+  const [docStatus, setDocStatus] = useState<{ done: number; pending: number; failed: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const scanRef = useRef<HTMLDivElement>(null)
 
@@ -41,6 +43,15 @@ export function SearchPage() {
     setPage(targetPage)
     setSearchParams({ q }, { replace: true })
     try {
+      if (mode === 'documents') {
+        const hits = await call(zeus.photos.docSearch(q))
+        setDocs(hits)
+        setResult(null)
+        setSemantic([])
+        const st = await call(zeus.photos.docStatus())
+        setDocStatus({ done: st.done, pending: st.queued + st.processing, failed: st.failed })
+        return
+      }
       if (mode === 'semantic') {
         const hits = await call(zeus.nlp.semantic(q))
         const resolved = await Promise.all(
@@ -128,6 +139,12 @@ export function SearchPage() {
         <div className="mt-3 flex gap-1.5">
           <button onClick={() => setMode('text')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'text' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Text + NLP</button>
           <button onClick={() => setMode('semantic')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'semantic' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Semantic</button>
+          <button onClick={() => setMode('documents')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'documents' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Documents (OCR)</button>
+          {mode === 'documents' && (
+            <button className="px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-vault-text2 hover:text-vault-text" onClick={() => void call(zeus.photos.ocrAll()).then((r) => toastOk('OCR queued', `${r.queued} document(s) queued`)).catch((e) => toastError('OCR failed', e instanceof Error ? e.message : undefined))}>
+              OCR all attachments
+            </button>
+          )}
           {mode === 'semantic' && (
             <button className="px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-vault-text2 hover:text-vault-text" onClick={() => void call(zeus.nlp.embedAll()).then((r) => toastOk('Embeddings built', `${r.embedded} profile(s)`)).catch((e) => toastError('Embedding failed', e instanceof Error ? e.message : undefined))}>
               Build embeddings
@@ -201,6 +218,21 @@ export function SearchPage() {
             <div className="flex h-full flex-col items-center justify-center gap-3">
               <Scan size={28} strokeWidth={1.25} className="animate-pulse text-vault-red" />
               <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-vault-muted">Scanning archive…</div>
+            </div>
+          )}
+          {!searching && !result && docs.length > 0 && (
+            <div className="p-4">
+              <div className="micro-label mb-2">
+                OCR matches{docStatus ? ` · ${docStatus.done} scanned · ${docStatus.pending} pending · ${docStatus.failed} failed` : ''}
+              </div>
+              <div className="space-y-1.5">
+                {docs.map((d) => (
+                  <button key={d.attachmentId} onClick={() => navigate(`/profiles/${d.profileId}`)} className="w-full border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-vault-red/40">
+                    <div className="font-mono text-[10px] text-vault-text">{d.name}</div>
+                    <div className="mt-0.5 line-clamp-2 font-mono text-[9px] text-vault-muted">…{d.snippet}…</div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {!searching && !result && semantic.length > 0 && (

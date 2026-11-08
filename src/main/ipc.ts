@@ -254,6 +254,9 @@ export function registerIpc(ctx: AppContext): void {
   handle('photos:recheck', 'unlock', (profileId: string) => ctx.photos!.recheck(String(profileId ?? '')))
   handle('photos:profile', 'unlock', (profileId: string) => ctx.photos!.profileTokens(String(profileId ?? '')))
   handle('photos:matchFace', 'unlock', (cropDataUrl: string) => ctx.photos!.matchFace(String(cropDataUrl ?? '')))
+  handle('docs:status', 'unlock', () => ctx.docs!.status({ ...actorOf(), userId: userIdOf() } as never))
+  handle('docs:ocrAll', 'standard', () => ctx.docs!.enqueueAll())
+  handle('docs:search', 'unlock', (text: string) => ctx.docs!.search(String(text ?? '')))
 
   // ---------------- categories ----------------
   handle('categories:list', 'unlock', () => ctx.categories!.list())

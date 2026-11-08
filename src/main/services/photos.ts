@@ -22,7 +22,7 @@ interface TokenRow {
   id: string
   profile_id: string
   image_id: string | null
-  kind: 'avatar' | 'gallery'
+  kind: 'avatar' | 'gallery' | 'attachment'
   phash: string | null
   ahash: string | null
   face_detected: number
@@ -59,7 +59,7 @@ export class PhotosService {
     }
   }
 
-  enqueue(profileId: string, imageId: string | null, kind: 'avatar' | 'gallery'): void {
+  enqueue(profileId: string, imageId: string | null, kind: 'avatar' | 'gallery' | 'attachment'): void {
     const now = new Date().toISOString()
     this.db.run(
       `INSERT OR REPLACE INTO photo_tokens(id, profile_id, image_id, kind, status, created_at, updated_at)
@@ -70,7 +70,7 @@ export class PhotosService {
     void this.kick()
   }
 
-  removeToken(profileId: string, imageId: string | null, kind: 'avatar' | 'gallery'): void {
+  removeToken(profileId: string, imageId: string | null, kind: 'avatar' | 'gallery' | 'attachment'): void {
     this.db.run('DELETE FROM photo_tokens WHERE profile_id = ? AND image_id IS ? AND kind = ?', [profileId, imageId, kind])
   }
 
@@ -79,6 +79,7 @@ export class PhotosService {
       'SELECT id, avatar_blob FROM profiles WHERE deleted_at IS NULL AND avatar_blob IS NOT NULL',
     )
     const gallery = this.db.all<{ id: string; profile_id: string }>('SELECT id, profile_id FROM profile_images WHERE kind = ? ', ['gallery'])
+    const attachments = this.db.all<{ id: string; profile_id: string }>(`SELECT id, profile_id FROM attachments WHERE mime LIKE 'image/%'`)
     const done = new Set(this.db.all<{ profile_id: string; image_id: string | null; kind: string }>(`SELECT profile_id, image_id, kind FROM photo_tokens WHERE status='done'`).map((r) => `${r.profile_id}|${r.image_id ?? ''}|${r.kind}`))
     const now = new Date().toISOString()
     const upsert = (profileId: string, imageId: string | null, kind: string) => {
@@ -98,6 +99,11 @@ export class PhotosService {
     for (const g of gallery) {
       if (done.has(`${g.profile_id}|${g.id}|gallery`)) continue
       upsert(g.profile_id, g.id, 'gallery')
+      n++
+    }
+    for (const a of attachments) {
+      if (done.has(`${a.profile_id}|${a.id}|attachment`)) continue
+      upsert(a.profile_id, a.id, 'attachment')
       n++
     }
     void this.kick()
@@ -168,8 +174,25 @@ export class PhotosService {
       const r = this.db.get<{ avatar_blob: string | null }>('SELECT avatar_blob FROM profiles WHERE id = ?', [profileId])
       return r?.avatar_blob ?? null
     }
+    if (kind === 'attachment') {
+      const r = this.db.get<{ blob: string }>('SELECT blob FROM attachments WHERE id = ? AND profile_id = ?', [imageId, profileId])
+      return r?.blob ?? null
+    }
     const r = this.db.get<{ blob: string }>('SELECT blob FROM profile_images WHERE id = ? AND profile_id = ?', [imageId, profileId])
     return r?.blob ?? null
+  }
+
+  private matchImage(r: TokenRow): { label: string; image: string | null } {
+    if (r.kind === 'avatar') return { label: 'Profile photo', image: this.imageDataUrl(r.profile_id, null, 'avatar') }
+    if (r.kind === 'gallery' && r.image_id) {
+      const img = this.db.get<{ name: string }>('SELECT name FROM profile_images WHERE id = ?', [r.image_id])
+      return { label: `Gallery: ${img?.name ?? r.image_id}`, image: this.imageDataUrl(r.profile_id, r.image_id, 'gallery') }
+    }
+    if (r.kind === 'attachment' && r.image_id) {
+      const att = this.db.get<{ name: string }>('SELECT name FROM attachments WHERE id = ?', [r.image_id])
+      return { label: `Attachment: ${att?.name ?? r.image_id}`, image: this.imageDataUrl(r.profile_id, r.image_id, 'attachment') }
+    }
+    return { label: r.kind, image: null }
   }
 
   async search(queryDataUrl: string, filters: { view?: string; categoryId?: string; country?: string; text?: string; minScore?: number } = {}): Promise<{ query: PhotoToken['phash']; faceDetected: boolean; matches: PhotoMatch[] }> {
@@ -184,10 +207,13 @@ export class PhotosService {
       if (!t) continue
       const s = scoreToken(query, t)
       if (s.score < (filters.minScore ?? 40)) continue
-      matches.push({ tokenId: r.id, profileId: r.profile_id, kind: r.kind, score: s.score, phashSim: s.phashSim, histSim: s.histSim, faceSim: s.faceSim, faceDetected: t.faceDetected })
+      const { label, image } = this.matchImage(r)
+      matches.push({ tokenId: r.id, profileId: r.profile_id, kind: r.kind, score: s.score, phashSim: s.phashSim, histSim: s.histSim, faceSim: s.faceSim, faceDetected: t.faceDetected, label, image })
     }
     matches.sort((a, b) => b.score - a.score)
-    return { query: query.phash, faceDetected: query.faceDetected, matches: matches.slice(0, 100) }
+    // Faces need a stricter bar: vague similarity is not identification.
+    const cutoff = query.faceDetected ? Math.max(filters.minScore ?? 0, 60) : (filters.minScore ?? 40)
+    return { query: query.phash, faceDetected: query.faceDetected, matches: matches.filter((m) => m.score >= cutoff).slice(0, 12) }
   }
 
   async matchFace(cropDataUrl: string): Promise<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]> {
@@ -206,7 +232,7 @@ export class PhotosService {
         best.set(r.profile_id, { profileId: r.profile_id, score: s.score, phashSim: s.phashSim, faceSim: s.faceSim })
       }
     }
-    const ranked = [...best.values()].filter((m) => m.score >= 40).sort((a, b) => b.score - a.score).slice(0, 5)
+    const ranked = [...best.values()].filter((m) => m.score >= 70).sort((a, b) => b.score - a.score).slice(0, 3)
     return ranked.map((m) => {
       const p = this.db.get<{ full_name: string; profile_code: string; avatar_blob: string | null }>('SELECT full_name, profile_code, avatar_blob FROM profiles WHERE id = ?', [m.profileId])
       return { ...m, name: p?.full_name ?? 'Unknown', code: p?.profile_code ?? '', avatar: p?.avatar_blob ?? null }

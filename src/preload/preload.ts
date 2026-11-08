@@ -65,9 +65,12 @@ const api: ZeusApi = {
     recheck: (profileId) => ipcRenderer.invoke('photos:recheck', profileId),
     profile: (profileId) => ipcRenderer.invoke('photos:profile', profileId),
     matchFace: (cropDataUrl) => ipcRenderer.invoke('photos:matchFace', cropDataUrl),
+    docStatus: () => ipcRenderer.invoke('docs:status'),
+    ocrAll: () => ipcRenderer.invoke('docs:ocrAll'),
+    docSearch: (text) => ipcRenderer.invoke('docs:search', text),
   },
   categories: {
-    list: () => ipcRenderer.invoke('categories:list'),
+      list: () => ipcRenderer.invoke('categories:list'),
     create: (input) => ipcRenderer.invoke('categories:create', input),
     update: (payload) => ipcRenderer.invoke('categories:update', payload),
     delete: (payload) => ipcRenderer.invoke('categories:delete', payload),

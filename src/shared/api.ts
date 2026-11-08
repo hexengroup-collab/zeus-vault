@@ -102,6 +102,9 @@ export interface ZeusApi {
     recheck: (profileId: string) => Promise<ApiResult<{ phash: string; faceDetected: boolean }>>
     profile: (profileId: string) => Promise<ApiResult<{ kind: string; status: string; faceDetected: boolean; phash: string | null }[]>>
     matchFace: (cropDataUrl: string) => Promise<ApiResult<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]>>
+    docStatus: () => Promise<ApiResult<{ queued: number; processing: number; done: number; failed: number; lastError: string | null }>>
+    ocrAll: () => Promise<ApiResult<{ queued: number }>>
+    docSearch: (text: string) => Promise<ApiResult<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>>
   }
   categories: {
     list: () => Promise<ApiResult<CategoryRecord[]>>

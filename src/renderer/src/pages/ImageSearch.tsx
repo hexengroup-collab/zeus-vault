@@ -163,12 +163,16 @@ export function ImageSearch() {
               const p = scores[m.profileId]
               return (
                 <Link key={m.tokenId} to={`/profiles/${m.profileId}`} className="flex items-center gap-3 border border-white/[0.08] bg-white/[0.02] p-3 transition-colors hover:border-vault-red/40">
-                  <Avatar src={p?.avatar ?? defaultAvatar(p?.name ?? '?')} name={p?.name ?? '?'} size={44} />
+                  {m.image ? (
+                    <img src={m.image} alt={m.label} className="h-11 w-11 shrink-0 rounded-[3px] object-cover" />
+                  ) : (
+                    <Avatar src={p?.avatar ?? defaultAvatar(p?.name ?? '?')} name={p?.name ?? '?'} size={44} />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px] font-semibold text-vault-text">{p?.name ?? m.profileId}</div>
-                    <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-vault-muted">
-                      {p?.code ?? ''} · {m.kind} · {SCORE_LABEL(m.score)}
-                      {m.faceDetected ? ' · face token' : ''}
+                    <div className="truncate font-mono text-[8px] uppercase tracking-[0.18em] text-vault-muted">
+                      {p?.code ?? ''} · {m.label} · {SCORE_LABEL(m.score)}
+                      {m.faceDetected ? ' · face data' : ''}
                     </div>
                   </div>
                   <div className="text-right">
