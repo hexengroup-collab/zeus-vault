@@ -72,6 +72,83 @@ A private encrypted dossier workstation for the desktop. Every profile is a stru
 
 ---
 
+## Who Uses Zeus Vault
+
+### 1. Business owners & executives
+
+- Business partner dossiers
+- Investor and stakeholder profiles
+- Client and supplier records
+- Corporate relationship management
+- Competitor research profiles
+
+### 2. Lawyers & legal professionals
+
+- Client dossiers
+- Case-related contact profiles
+- Witness and expert profiles
+- Case reference information
+- Legal research records
+
+*Subject to confidentiality, access controls, and applicable legal requirements.*
+
+### 3. Lawmakers & policymakers
+
+- Stakeholder profiles
+- Policy research dossiers
+- Public figure profiles
+- Constituency-related contact records
+- Meeting and briefing references
+
+### 4. Journalists & researchers
+
+- Source directories
+- Interview profiles
+- Research subject dossiers
+- Investigation reference notes
+- Document and evidence references
+
+### 5. Investigators & compliance professionals
+
+- Subject reference profiles
+- Investigation-related records
+- Due diligence dossiers
+- Compliance documentation
+- Source and evidence references
+
+### 6. HR & recruitment professionals
+
+- Candidate profiles
+- Interview records
+- Professional references
+- Recruitment history
+- Employee documentation
+
+### 7. Financial professionals
+
+- Client reference dossiers
+- Business ownership profiles
+- Investment research records
+- Due diligence documentation
+- Relationship records
+
+### 8. Also built for
+
+| Who | Typical records |
+| --- | --- |
+| Diplomats | Professional contact and briefing dossiers |
+| Political consultants | Public stakeholder and campaign research |
+| Security consultants | Authorized security assessment records |
+| NGOs | Beneficiary and partner records |
+| Academics | Research subject and reference profiles |
+| Sales directors | Prospect and enterprise account dossiers |
+| Family offices | Relationship and asset reference records |
+| Corporate intelligence teams | Lawfully collected business intelligence |
+
+*Use Zeus Vault only for records you hold lawfully and are authorized to store.*
+
+---
+
 ## Screen Showcase
 
 <table>
