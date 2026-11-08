@@ -46,6 +46,38 @@ export function SearchPage() {
   const [qrDocs, setQrDocs] = useState<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>([])
   const [compare, setCompare] = useState<{ match: PhotoMatch } | null>(null)
   const [, setQueue] = useState<PhotoQueueStatus | null>(null)
+  const [trainBusy, setTrainBusy] = useState(false)
+
+  const trainFaces = async () => {
+    if (trainBusy) return
+    setTrainBusy(true)
+    try {
+      const { captureDescriptor } = await import('@/lib/facefinder')
+      const all = await call(zeus.profiles.list({ view: 'all-status', page: 1, pageSize: 250 }))
+      let n = 0
+      for (const p of all.rows) {
+        const detail = await call(zeus.profiles.get(p.id))
+        const sources: { url: string; kind: 'avatar' | 'gallery' | 'attachment' }[] = [
+          ...(detail.avatar ? [{ url: detail.avatar, kind: 'avatar' as const }] : []),
+          ...(detail.images ?? []).map((i) => ({ url: i.dataUrl, kind: 'gallery' as const })),
+          ...(detail.attachments ?? []).filter((a) => a.mime.startsWith('image/')).map((a) => ({ url: a.dataUrl, kind: 'attachment' as const })),
+        ]
+        for (const s of sources) {
+          const desc = await captureDescriptor(s.url)
+          if (desc) {
+            await call(zeus.photos.saveDesc({ profileId: p.id, desc, kind: s.kind }))
+            n++
+          }
+          await new Promise((r) => setTimeout(r, 30))
+        }
+      }
+      toastOk('Training complete', `${n} photo(s) now carry deep face data`)
+    } catch (e) {
+      toastError('Training failed', e instanceof Error ? e.message : undefined)
+    } finally {
+      setTrainBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (mode !== 'photos') return
@@ -329,6 +361,13 @@ export function SearchPage() {
                   onClick={() => dataUrl && void runPhotoSearch(dataUrl)}
                 >
                   <Scan size={12} /> {photoBusy ? 'Matching…' : 'Search again'}
+                </button>
+                <button
+                  className="vault-btn vault-btn-ghost h-9"
+                  disabled={trainBusy}
+                  onClick={() => void trainFaces()}
+                >
+                  <Scan size={12} /> {trainBusy ? 'Training…' : 'Train faces (all photos)'}
                 </button>
               </div>
               {qr && (
