@@ -246,7 +246,7 @@ export function registerIpc(ctx: AppContext): void {
     return null
   })
   handle('nlp:embedAll', 'standard', () => ctx.nlp!.embedAll())
-  handle('nlp:semantic', 'unlock', (text: string) => ctx.nlp!.semanticSearch(String(text ?? '').slice(0, 1000)))
+  handle('nlp:semantic', 'unlock', (text: string) => ctx.nlp!.semanticSearch(applyUserAliases(String(text ?? '').slice(0, 1000), ctx.nlp!.aliasMap())))
 
   handle('photos:status', 'unlock', () => ctx.photos!.status({ ...actorOf(), userId: userIdOf() } as never))
   handle('photos:enqueueAll', 'standard', () => ctx.photos!.enqueueAllProfiles())

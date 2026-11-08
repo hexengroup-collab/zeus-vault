@@ -53,6 +53,23 @@ A private encrypted dossier workstation for the desktop. Every profile is a stru
 
 ---
 
+## Why Zeus Vault (the superior manager)
+
+| | Zeus Vault | Typical profile managers |
+| --- | --- | --- |
+| Storage | Encrypted everywhere (AES-256-GCM field encryption, Argon2id, hash-chained audit ledger) | Spreadsheet / CSV / CLIs of plain text |
+| Visual search | On-device face descriptors + perceptual tokens — same person found across photos | Photo albums, no identity matching |
+| Person finding | 478-point biometrics, meshes, boxes, evidence distances on every verdict | None |
+| Text + NLP | Natural-language queries with alias translation and stem-aware recall | Keyword filters only |
+| Semantic search | TF-IDF local embeddings, semantic profile ranking | None |
+| Documents | OCR on attachments, searched by visible text, QR decoded | Manual folder digging |
+| Connectivity | Local MCP server with API keys (24 tools), full RBAC | Zip files |
+| Telemetry | Zero — every byte stays on the machine, verified in Security Center | Ad-supported / cloud-locked |
+
+**The manager that understands faces, documents, and plain language — and proves it with hashes.**
+
+---
+
 ## Feature Highlights
 
 | Icon | Feature | What it does |

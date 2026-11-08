@@ -30,6 +30,15 @@ export function About() {
         </p>
       </div>
 
+      <div className="mt-4 vault-panel p-6">
+        <h2 className="font-condensed text-2xl font-semibold tracking-wide text-vault-text">Why it is different</h2>
+        <ul className="mt-3 space-y-1.5 text-[11.5px] leading-relaxed text-vault-text2">
+          <li>Faces: on-device deep descriptors + 478-point biometrics, distance-verified verdicts, quality-aware precision, profiles and partial faces included.</li>
+          <li>Five ways to find anything: text + NLP, semantic embeddings (TF-IDF), photographs (visual + QR), documents (OCR), and MCP tool access.</li>
+          <li>Offline-first by design: every model ships inside the app. No cloud, no accounts, no telemetry — ever.</li>
+        </ul>
+      </div>
+
       <div className="mt-4 vault-panel flex items-start gap-3 p-6">
         <ShieldCheck size={20} strokeWidth={1.5} className="mt-0.5 shrink-0 text-vault-green" />
         <p className="text-[11.5px] leading-relaxed text-vault-text2">

@@ -1,6 +1,6 @@
 // NLP support service: user-editable aliases + local hashed embeddings.
 import type { Db } from '../db/sqlite'
-import { embedText, cosine } from '../lib/embed'
+import { embedText, embedTfidf, computeIdf, cosine } from '../lib/embed'
 import { AppError } from '../lib/errors'
 import type { Actor } from './audit'
 
@@ -74,7 +74,16 @@ export class NlpService {
 
   embedAll(): { embedded: number } {
     const ids = this.db.all<{ id: string }>('SELECT id FROM profiles WHERE deleted_at IS NULL')
-    for (const { id } of ids) this.embedProfile(id)
+    const texts = ids.map(({ id }) => this.profileText(id))
+    const idf = computeIdf(texts)
+    for (let i = 0; i < ids.length; i++) {
+      const v = embedTfidf(texts[i], idf)
+      this.db.run('INSERT OR REPLACE INTO text_embeddings(profile_id, vector, updated_at) VALUES (?,?,?)', [
+        ids[i].id,
+        JSON.stringify(v),
+        new Date().toISOString(),
+      ])
+    }
     return { embedded: ids.length }
   }
 
