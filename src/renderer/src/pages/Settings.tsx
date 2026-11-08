@@ -8,7 +8,7 @@ import { toastError, toastInfo, toastOk } from '@/stores/toast'
 import { applyAppearance } from '@/lib/appearance'
 import { bytes } from '@/lib/format'
 import type { AppSettings, IntegrityResult } from '@shared/types'
-import { DATE_FORMATS } from '@shared/constants'
+import { DATE_FORMATS, FOLDER_PRESETS } from '@shared/constants'
 
 type Tab = 'general' | 'security' | 'appearance' | 'database'
 
@@ -185,6 +185,24 @@ export function SettingsPage() {
               <p className="micro-label mt-1">Local-first · encrypted · verifiable</p>
             </div>
             <div className="vault-panel p-4">
+              <div className="micro-label">Export & Backup Destinations</div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FieldRow label="Export folder">
+                  <select className="vault-select h-10 w-full px-2" value={s.exportFolderPreset} disabled={disabled} onChange={(e) => void apply({ exportFolderPreset: e.target.value as AppSettings['exportFolderPreset'] })}>
+                    {FOLDER_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  </select>
+                </FieldRow>
+                <FieldRow label="Backup folder">
+                  <select className="vault-select h-10 w-full px-2" value={s.backupFolderPreset} disabled={disabled} onChange={(e) => void apply({ backupFolderPreset: e.target.value as AppSettings['backupFolderPreset'] })}>
+                    {FOLDER_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  </select>
+                </FieldRow>
+              </div>
+            </div>
+
+            <NlpAliasesCard disabled={disabled} />
+
+            <div className="vault-panel p-4">
               <div className="micro-label">Storage Location</div>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <code className="truncate font-mono text-[10px] text-vault-text2" title={app?.dbPath}>{app?.dbPath ?? ' - '}</code>
@@ -225,6 +243,66 @@ export function SettingsPage() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function NlpAliasesCard({ disabled }: { disabled: boolean }) {
+  const { data, reload } = useAsync(() => call(zeus.nlp.aliases()), [])
+  const [alias, setAlias] = useState('')
+  const [canonical, setCanonical] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const add = async () => {
+    if (busy || !alias.trim() || !canonical.trim()) return
+    setBusy(true)
+    try {
+      await call(zeus.nlp.addAlias({ alias: alias.trim(), canonical: canonical.trim() }))
+      setAlias('')
+      setCanonical('')
+      toastOk('Alias saved')
+      reload()
+    } catch (e) {
+      toastError('Alias refused', e instanceof Error ? e.message : undefined)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const embed = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const r = await call(zeus.nlp.embedAll())
+      toastOk('Embeddings built', `${r.embedded} profile(s) embedded locally`)
+    } catch (e) {
+      toastError('Embedding failed', e instanceof Error ? e.message : undefined)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="vault-panel p-4">
+      <div className="flex items-center justify-between">
+        <div className="micro-label">Intelligence Engine · Aliases & Embeddings</div>
+        <button className="vault-btn" disabled={disabled || busy} onClick={() => void embed()}>Build embeddings (all profiles)</button>
+      </div>
+      <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-vault-muted">User aliases expand natural-language queries · embeddings power semantic search (100% local)</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <input className="vault-input h-9 min-w-32 flex-1 px-2 text-[11px]" placeholder="Alias (e.g. telco)" value={alias} onChange={(e) => setAlias(e.target.value)} disabled={disabled} aria-label="Alias" />
+        <input className="vault-input h-9 min-w-32 flex-1 px-2 text-[11px]" placeholder="Canonical (e.g. telecom)" value={canonical} onChange={(e) => setCanonical(e.target.value)} disabled={disabled} aria-label="Canonical value" />
+        <button className="vault-btn vault-btn-primary" disabled={disabled || busy} onClick={() => void add()}>Add alias</button>
+      </div>
+      <div className="mt-3 max-h-40 space-y-1 overflow-y-auto">
+        {(data ?? []).map((a) => (
+          <div key={a.alias} className="flex items-center justify-between border border-white/[0.06] px-2 py-1.5 font-mono text-[10px]">
+            <span className="text-vault-text2">{a.alias} → <span className="text-vault-text">{a.canonical}</span></span>
+            <button className="text-vault-muted hover:text-vault-red" disabled={disabled} onClick={() => void call(zeus.nlp.deleteAlias(a.alias)).then(() => reload()).catch(() => {})} aria-label={`Delete alias ${a.alias}`}>✕</button>
+          </div>
+        ))}
+        {(data ?? []).length === 0 && <div className="py-2 font-mono text-[9px] text-vault-muted">No custom aliases yet</div>}
       </div>
     </div>
   )

@@ -15,7 +15,7 @@ function startOfDay(d: Date): Date {
 
 function stripSearchWords(text: string): string {
   return text
-    .replace(/\b(find|show|list|search|get|give|display|bring|pull|fetch|look up|lookup|all|me|everyone|everybody|profiles?|people|persons?|records?|dossiers?|subjects?|that|which|who|whose|with|have|has|having|having got|are|is|the|a|an|created|updated|edited|modified)\b/gi, ' ')
+    .replace(/\b(find|show|list|search|get|give|display|bring|pull|fetch|look up|lookup|all|me|everyone|everybody|profiles?|people|persons?|records?|dossiers?|subjects?|candidates?|contacts?|clients?|partners?|stakeholders?|beneficiaries|witnesses|experts|investors|customers?|employees|students?|colleagues?|that|which|who|whose|with|have|has|having|having got|are|is|the|a|an|created|updated|edited|modified|matching|called|named)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }

@@ -35,6 +35,8 @@ const ENUMS: Partial<Record<keyof AppSettings, string[]>> = {
   motionPreference: ['system', 'custom'],
   tableDensity: ['compact', 'comfortable'],
   previewBehavior: ['proximity', 'hover', 'off'],
+  exportFolderPreset: ['vault', 'documents', 'desktop', 'downloads', 'custom'],
+  backupFolderPreset: ['vault', 'documents', 'desktop', 'downloads', 'custom'],
 }
 const TEXT: (keyof AppSettings)[] = [
   'appName',

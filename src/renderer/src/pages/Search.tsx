@@ -26,6 +26,8 @@ export function SearchPage() {
   const [result, setResult] = useState<SearchResults | null>(null)
   const [searching, setSearching] = useState(false)
   const [page, setPage] = useState(1)
+  const [mode, setMode] = useState<'text' | 'semantic'>('text')
+  const [semantic, setSemantic] = useState<{ profileId: string; score: number }[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const scanRef = useRef<HTMLDivElement>(null)
 
@@ -39,8 +41,26 @@ export function SearchPage() {
     setPage(targetPage)
     setSearchParams({ q }, { replace: true })
     try {
+      if (mode === 'semantic') {
+        const hits = await call(zeus.nlp.semantic(q))
+        const resolved = await Promise.all(
+          hits.map(async (h) => {
+            try {
+              const d = await call(zeus.profiles.get(h.profileId))
+              return { h, d }
+            } catch {
+              return null
+            }
+          }),
+        )
+        void resolved
+        setSemantic(hits)
+        setResult(null)
+        return
+      }
       const r = await call(zeus.search.query({ text: q, page: targetPage, pageSize: 50 }))
       setResult(r)
+      setSemantic([])
       void reloadRecent()
     } catch (e) {
       toastError('Search failed', e instanceof Error ? e.message : undefined)
@@ -104,6 +124,16 @@ export function SearchPage() {
             <CornerDownLeft size={15} />
           </button>
         </form>
+
+        <div className="mt-3 flex gap-1.5">
+          <button onClick={() => setMode('text')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'text' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Text + NLP</button>
+          <button onClick={() => setMode('semantic')} className={`px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${mode === 'semantic' ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>Semantic</button>
+          {mode === 'semantic' && (
+            <button className="px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-vault-text2 hover:text-vault-text" onClick={() => void call(zeus.nlp.embedAll()).then((r) => toastOk('Embeddings built', `${r.embedded} profile(s)`)).catch((e) => toastError('Embedding failed', e instanceof Error ? e.message : undefined))}>
+              Build embeddings
+            </button>
+          )}
+        </div>
 
         <div className="mt-4">
           <div className="micro-label mb-1.5">Example Queries</div>
@@ -171,6 +201,19 @@ export function SearchPage() {
             <div className="flex h-full flex-col items-center justify-center gap-3">
               <Scan size={28} strokeWidth={1.25} className="animate-pulse text-vault-red" />
               <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-vault-muted">Scanning archive…</div>
+            </div>
+          )}
+          {!searching && !result && semantic.length > 0 && (
+            <div className="p-4">
+              <div className="micro-label mb-2">Semantic matches · local embeddings · cosine similarity</div>
+              <div className="space-y-1.5">
+                {semantic.map((s) => (
+                  <button key={s.profileId} onClick={() => navigate(`/profiles/${s.profileId}`)} className="flex w-full items-center justify-between border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-vault-red/40">
+                    <span className="font-mono text-[10px] text-vault-text2">{s.profileId.slice(0, 8)}…</span>
+                    <span className="font-mono text-[11px] font-bold text-vault-red">{s.score.toFixed(1)}%</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {!searching && result && (

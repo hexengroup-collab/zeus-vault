@@ -54,6 +54,8 @@ export function Dossier() {
 
   const { data: history } = useAsync(() => call(zeus.profiles.fieldHistory(id!)), [id])
   const { data: auditTrail } = useAsync(() => call(zeus.profiles.audit(id!)), [id])
+  const { data: tokens } = useAsync(() => call(zeus.photos.profile(id!)), [id, data?.avatar])
+  const avatarToken = tokens?.find((t) => t.kind === 'avatar')
 
   useEffect(() => {
     if (data) setFavorite(data.isFavorite)
@@ -196,6 +198,11 @@ export function Dossier() {
               <span className="chip">{d.basic.categoryName}</span>
               <span className={`chip ${d.status === 'active' ? '!border-vault-green/40 !text-vault-green' : '!border-vault-amber/40 !text-vault-amber'}`}>{d.status}</span>
               {age !== null && <span className="chip">AGE {age}</span>}
+              {d.avatar && (
+                <span className={`chip ${!avatarToken ? '!border-vault-amber/40 !text-vault-amber' : avatarToken.status === 'done' ? '!border-vault-green/40 !text-vault-green' : '!border-vault-amber/40 !text-vault-amber'}`} title="Photo token status">
+                  TOKEN: {!avatarToken ? 'QUEUED' : avatarToken.status.toUpperCase()}{avatarToken?.faceDetected ? ' · FACE' : ''}
+                </span>
+              )}
             </div>
             {/* Action row */}
             <div className="mt-4 flex flex-wrap items-center gap-1.5">

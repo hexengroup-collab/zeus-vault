@@ -47,6 +47,33 @@ export const FIELD_ALIASES: AliasDef[] = [
   { key: 'category', label: 'Category', aliases: ['category', 'classification', 'record type'], category: 'Meta' },
 ]
 
+// Extra vocabulary merged into existing fields (wider deterministic coverage).
+const VOCAB_EXTRA: Record<string, string[]> = {
+  fullName: ['client name', 'subject', 'contact name', 'partner name', 'stakeholder name', 'candidate name', 'beneficiary name'],
+  jobTitle: ['chief', 'senior', 'junior', 'head of', 'managing director', 'ceo', 'founder', 'co-founder', 'owner', 'chairman', 'partner', 'director', 'manager', 'consultant', 'advocate', 'attorney', 'lawyer', 'accountant', 'engineer', 'developer', 'designer', 'analyst', 'researcher', 'investigator', 'auditor', 'recruiter', 'journalist', 'professor', 'diplomat', 'senator', 'minister'],
+  industry: ['technology', 'finance', 'banking', 'insurance', 'healthcare', 'health care', 'education', 'construction', 'logistics', 'transport', 'energy', 'oil and gas', 'mining', 'agriculture', 'food', 'beverage', 'retail', 'hospitality', 'tourism', 'media', 'entertainment', 'law', 'legal', 'accounting', 'consulting', 'manufacturing', 'pharmaceutical', 'real estate', 'automotive', 'telecom', 'telecommunications', 'government', 'ngo', 'charity', 'defense', 'security', 'cyber security', 'fashion', 'pharma', 'tech', 'it', 'information technology'],
+  company: ['limited', 'ltd', 'inc', 'llc', 'corp', 'corporation', 'plc', 'group', 'holdings', 'enterprises', 'international'],
+  website: ['linkedin', 'linkdin', 'twitter', 'facebook', 'instagram', 'github'],
+  dob: ['birthday', 'date-of-birth', 'd.o.b', 'born in', 'age is', 'years old'],
+  country: ['hometown', 'resident of'],
+  primaryPhone: ['whatsapp', 'call me on', 'cell phone', 'mobile no', 'phone no is'],
+  primaryEmail: ['gmail', 'outlook', 'yahoo', 'reach me via email'],
+}
+for (const def of FIELD_ALIASES) {
+  const extra = VOCAB_EXTRA[def.key]
+  if (extra) for (const a of extra) if (!def.aliases.includes(a)) def.aliases.push(a)
+}
+
+export function applyUserAliases(text: string, aliases: ReadonlyMap<string, string>): string {
+  let out = text.toLowerCase()
+  const keys = [...aliases.keys()].sort((a, b) => b.length - a.length)
+  for (const k of keys) {
+    const canonical = aliases.get(k)
+    if (canonical) out = out.split(k).join(canonical.toLowerCase())
+  }
+  return out
+}
+
 const CATEGORY_BY_KEY: Record<string, FieldCategory> = Object.fromEntries(FIELD_ALIASES.map((a) => [a.key, a.category]))
 
 const LOCATION_PREPOSITIONS = ['lives in', 'living in', 'based in', 'resides in', 'residing in', 'located in', 'from', 'in', 'near']

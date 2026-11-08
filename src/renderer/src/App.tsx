@@ -13,6 +13,8 @@ import { ProfileForm } from '@/pages/ProfileForm'
 import { Dossier } from '@/pages/Dossier'
 import { B2bContacts } from '@/pages/B2bContacts'
 import { SearchPage } from '@/pages/Search'
+import { ImageSearch } from '@/pages/ImageSearch'
+import { PersonFinder } from '@/pages/PersonFinder'
 import { Categories } from '@/pages/Categories'
 import { Countries } from '@/pages/Countries'
 import { Favorites } from '@/pages/Favorites'
@@ -104,6 +106,8 @@ function VaultRoutes() {
         <Route path="/profiles/:id" element={<Dossier />} />
         <Route path="/profiles/:id/edit" element={<ProfileForm mode="edit" />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/image-search" element={<ImageSearch />} />
+        <Route path="/person-finder" element={<PersonFinder />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/countries" element={<Countries />} />
         <Route path="/favorites" element={<Favorites />} />

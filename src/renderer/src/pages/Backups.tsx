@@ -7,12 +7,14 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { toastError, toastOk } from '@/stores/toast'
 import { bytes } from '@/lib/format'
 import { formatTimestamp, relativeTime } from '@shared/time'
-import type { BackupEntry } from '@shared/types'
+import type { BackupEntry, FolderPreset } from '@shared/types'
+import { FOLDER_PRESETS } from '@shared/constants'
 
 export function Backups() {
   const { user } = useSession()
   const isAdmin = user?.role === 'admin'
   const { data: backups, loading, reload } = useAsync(() => call(zeus.backup.list()), [])
+  const { data: settings, reload: reloadSettings } = useAsync(() => call(zeus.settings.get()), [])
   const [label, setLabel] = useState('')
   const [busy, setBusy] = useState<'encrypted' | 'plain' | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<BackupEntry | null>(null)
@@ -40,6 +42,28 @@ export function Backups() {
       <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.25em] text-vault-muted">Encrypted point-in-time snapshots · restore with automatic safety copy</p>
 
       {/* Create */}
+      {isAdmin && (
+        <div className="vault-panel mt-5 flex flex-wrap items-center gap-3 p-4">
+          <select
+            value={settings?.backupFolderPreset ?? 'vault'}
+            onChange={async (e) => {
+              try {
+                await call(zeus.settings.update({ backupFolderPreset: e.target.value as FolderPreset }))
+                reloadSettings()
+                toastOk('Backup destination saved', e.target.value)
+              } catch (err) {
+                toastError('Update refused', err instanceof Error ? err.message : undefined)
+              }
+            }}
+            className="vault-input h-10 px-2 text-[11px]"
+            aria-label="Backup destination"
+          >
+            {FOLDER_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {isAdmin && (
         <div className="vault-panel mt-5 flex flex-wrap items-center gap-3 p-4">
           <input className="vault-input h-10 min-w-52 flex-1 px-3" placeholder="Backup label (optional)…" value={label} onChange={(e) => setLabel(e.target.value)} aria-label="Backup label" />

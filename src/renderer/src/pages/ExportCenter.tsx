@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { AlertTriangle, Download, FileBadge, FileJson, FileSpreadsheet, FolderOpen } from 'lucide-react'
 import { call, zeus } from '@/lib/api'
+import { useAsync } from '@/lib/useAsync'
 import { useSession } from '@/stores/session'
 import { toastError, toastOk } from '@/stores/toast'
-import { ROLE_LABELS } from '@shared/constants'
+import { ROLE_LABELS, FOLDER_PRESETS } from '@shared/constants'
+import type { FolderPreset } from '@shared/types'
 
 type Format = 'csv' | 'json' | 'xlsx' | 'pdf'
 
@@ -21,17 +23,28 @@ export function ExportCenter() {
   const [includeSensitive, setIncludeSensitive] = useState(false)
   const [busy, setBusy] = useState(false)
   const [lastFile, setLastFile] = useState<string | null>(null)
-
+  const { data: settings, reload: reloadSettings } = useAsync(() => call(zeus.settings.get()), [])
   const canExportSensitive = user?.role !== 'readonly'
+
+  const setPreset = async (preset: FolderPreset) => {
+    try {
+      await call(zeus.settings.update({ exportFolderPreset: preset }))
+      reloadSettings()
+      toastOk('Destination saved', preset)
+    } catch (e) {
+      toastError('Update refused', e instanceof Error ? e.message : undefined)
+    }
+  }
 
   const run = async () => {
     if (busy) return
     setBusy(true)
     try {
-      const picked = await call(zeus.importexport.pickSave({ format, defaultName: `zeus-vault-export.${format}` }))
-      if (!picked) return
       const filters = scope === 'all' ? { view: 'all-status' as const } : { view: scope }
-      const result = await call(zeus.importexport.exportProfiles({ filters, format, includeSensitive: includeSensitive && canExportSensitive, targetPath: picked.filePath }))
+      const preset = settings?.exportFolderPreset ?? 'custom'
+      const targetPath = preset === 'vault' || preset === 'custom' ? (await call(zeus.importexport.pickSave({ format, defaultName: `zeus-vault-export.${format}` })))?.filePath : undefined
+      if ((preset === 'vault' || preset === 'custom') && !targetPath) return
+      const result = await call(zeus.importexport.exportProfiles({ filters, format, includeSensitive: includeSensitive && canExportSensitive, targetPath }))
       setLastFile(result.filePath)
       toastOk('Export complete', `${result.count} record(s) -> ${result.filePath}`)
     } catch (e) {
@@ -86,6 +99,16 @@ export function ExportCenter() {
             <AlertTriangle size={12} /> Credentials will be written in plaintext to the export file
           </div>
         )}
+
+        <div className="micro-label mb-2 mt-5">04 - Destination</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {FOLDER_PRESETS.map((p) => (
+            <button key={p.id} onClick={() => void setPreset(p.id)} className={`px-3 py-2 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors ${(settings?.exportFolderPreset ?? 'custom') === p.id ? 'bg-vault-red/90 text-[#0D0507]' : 'border border-white/10 text-vault-text2 hover:text-vault-text'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 font-mono text-[8px] uppercase tracking-[0.18em] text-vault-muted">Concrete folders export directly · vault/custom open the save dialog</p>
 
         <button className="vault-btn vault-btn-primary mt-6 h-11 w-full justify-center" onClick={() => void run()} disabled={busy}>
           <Download size={13} /> {busy ? 'Exporting…' : 'Execute Export'}

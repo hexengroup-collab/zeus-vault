@@ -2,6 +2,7 @@
 import path from 'node:path'
 import type { Db } from '../db/sqlite'
 import { AppError, assertFound } from '../lib/errors'
+import { presetDir, ensureWritableDir } from '../lib/vision'
 import type { AuditService, Actor } from './audit'
 import type { SettingsService } from './settings'
 import type { BackupEntry } from '../../shared/types'
@@ -19,12 +20,14 @@ export class BackupService {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const safeLabel = (label ?? (mode === 'encrypted' ? 'Encrypted backup' : 'Plain backup')).trim().slice(0, 80) || 'Backup'
     const id = crypto.randomUUID()
+    const s = this.settings.get()
+    const dir = s.backupFolderPreset && s.backupFolderPreset !== 'vault' && s.backupFolderPreset !== 'custom' ? ensureWritableDir(presetDir(s.backupFolderPreset, this.backupsDir, this.backupsDir, 'backups')) : this.backupsDir
     let filePath: string
     if (mode === 'encrypted') {
-      filePath = path.join(this.backupsDir, `zeus-vault-${stamp}.zvbak`)
+      filePath = path.join(dir, `zeus-vault-${stamp}.zvbak`)
       fs.writeFileSync(filePath, this.createSnapshot())
     } else {
-      filePath = path.join(this.backupsDir, `zeus-vault-${stamp}.db`)
+      filePath = path.join(dir, `zeus-vault-${stamp}.db`)
       const tmp = `${filePath}.tmp`
       this.db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`)
       fs.renameSync(tmp, filePath)

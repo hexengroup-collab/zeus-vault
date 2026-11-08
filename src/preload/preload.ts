@@ -52,6 +52,19 @@ const api: ZeusApi = {
   nlp: {
     extract: (text) => ipcRenderer.invoke('nlp:extract', text),
     interpret: (text) => ipcRenderer.invoke('nlp:interpret', text),
+    aliases: () => ipcRenderer.invoke('nlp:aliases'),
+    addAlias: (payload) => ipcRenderer.invoke('nlp:addAlias', payload),
+    deleteAlias: (alias) => ipcRenderer.invoke('nlp:deleteAlias', alias),
+    embedAll: () => ipcRenderer.invoke('nlp:embedAll'),
+    semantic: (text) => ipcRenderer.invoke('nlp:semantic', text),
+  },
+  photos: {
+    status: () => ipcRenderer.invoke('photos:status'),
+    enqueueAll: () => ipcRenderer.invoke('photos:enqueueAll'),
+    search: (payload) => ipcRenderer.invoke('photos:search', payload),
+    recheck: (profileId) => ipcRenderer.invoke('photos:recheck', profileId),
+    profile: (profileId) => ipcRenderer.invoke('photos:profile', profileId),
+    matchFace: (cropDataUrl) => ipcRenderer.invoke('photos:matchFace', cropDataUrl),
   },
   categories: {
     list: () => ipcRenderer.invoke('categories:list'),

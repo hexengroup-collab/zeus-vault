@@ -399,6 +399,34 @@ export interface AppSettings {
   backupRetention: number
   mcpEnabled: boolean
   mcpPort: number
+  exportFolderPreset: FolderPreset
+  backupFolderPreset: FolderPreset
+}
+
+export type FolderPreset = 'vault' | 'documents' | 'desktop' | 'downloads' | 'custom'
+
+export interface PhotoQueueStatus {
+  queued: number
+  processing: number
+  done: number
+  failed: number
+  current: string | null
+}
+
+export interface PhotoMatch {
+  tokenId: string
+  profileId: string
+  kind: 'avatar' | 'gallery'
+  score: number
+  phashSim: number
+  histSim: number
+  faceSim: number | null
+  faceDetected: boolean
+}
+
+export interface NlpAlias {
+  alias: string
+  canonical: string
 }
 
 export type SettingsSection = 'general' | 'security' | 'appearance'

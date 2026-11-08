@@ -232,6 +232,27 @@ export function registerIpc(ctx: AppContext): void {
   })
 
   handle('nlp:interpret', 'unlock', (text: string) => interpretQuery(String(text ?? '').slice(0, 500), { currentUsername: ctx.auth?.currentUser()?.username }))
+  handle('nlp:aliases', 'unlock', () => {
+    const aliases = ctx.nlp!.aliases()
+    return aliases.length > 500 ? aliases.slice(0, 500) : aliases
+  })
+  handle('nlp:addAlias', 'standard', (payload: { alias: string; canonical: string }) => {
+    ctx.nlp!.addAlias(String(payload.alias ?? ''), String(payload.canonical ?? ''), actorOf())
+    return null
+  })
+  handle('nlp:deleteAlias', 'standard', (alias: string) => {
+    ctx.nlp!.deleteAlias(String(alias ?? ''))
+    return null
+  })
+  handle('nlp:embedAll', 'standard', () => ctx.nlp!.embedAll())
+  handle('nlp:semantic', 'unlock', (text: string) => ctx.nlp!.semanticSearch(String(text ?? '').slice(0, 1000)))
+
+  handle('photos:status', 'unlock', () => ctx.photos!.status({ ...actorOf(), userId: userIdOf() } as never))
+  handle('photos:enqueueAll', 'standard', () => ctx.photos!.enqueueAllProfiles())
+  handle('photos:search', 'unlock', (payload: { dataUrl: string; view?: string; categoryId?: string; country?: string; text?: string; minScore?: number }) => ctx.photos!.search(String(payload.dataUrl ?? ''), { view: payload.view, categoryId: payload.categoryId, country: payload.country, text: payload.text, minScore: payload.minScore }))
+  handle('photos:recheck', 'unlock', (profileId: string) => ctx.photos!.recheck(String(profileId ?? '')))
+  handle('photos:profile', 'unlock', (profileId: string) => ctx.photos!.profileTokens(String(profileId ?? '')))
+  handle('photos:matchFace', 'unlock', (cropDataUrl: string) => ctx.photos!.matchFace(String(cropDataUrl ?? '')))
 
   // ---------------- categories ----------------
   handle('categories:list', 'unlock', () => ctx.categories!.list())

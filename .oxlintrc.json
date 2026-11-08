@@ -5,7 +5,7 @@
     "correctness": "error",
     "suspicious": "warn"
   },
-  "ignorePatterns": ["dist/**", "dist-electron/**", "release/**", "node_modules/**"],
+  "ignorePatterns": ["dist/**", "dist-electron/**", "release/**", "node_modules/**", "src/renderer/public/**"],
   "overrides": [
     {
       "files": ["scripts/**/*.mjs"],

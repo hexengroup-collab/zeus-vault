@@ -89,6 +89,8 @@ export interface ProfileActor extends Actor {
 }
 
 export class ProfilesService {
+  photoHook?: (profileId: string, imageId: string | null, kind: 'avatar' | 'gallery') => void
+  photoRemovedHook?: (profileId: string, imageId: string | null, kind: 'avatar' | 'gallery') => void
   constructor(
     private db: Db,
     private audit: AuditService,
@@ -1038,6 +1040,7 @@ export class ProfilesService {
     if (dataUrl === null) {
       this.db.run('UPDATE profiles SET avatar_blob = NULL, updated_by = ?, updated_by_user_id = ?, updated_at = ? WHERE id = ?', [actor.username, actor.id, new Date().toISOString(), id])
       this.audit.record(actor, { eventType: 'PROFILE_IMAGE_CHANGED', targetType: 'profile', targetId: id, targetLabel: p.full_name, detail: 'Profile photograph removed' })
+      this.photoRemovedHook?.(id, null, 'avatar')
       return
     }
     const check = this.checkDataUrl(dataUrl, 2 * 1024 * 1024)
@@ -1045,6 +1048,7 @@ export class ProfilesService {
     if (!/^image\/(jpeg|png|webp)$/.test(check.mime)) throw new AppError('VALIDATION', 'Only JPG, PNG and WebP images are supported.')
     this.db.run('UPDATE profiles SET avatar_blob = ?, updated_by = ?, updated_by_user_id = ?, updated_at = ? WHERE id = ?', [dataUrl, actor.username, actor.id, new Date().toISOString(), id])
     this.audit.record(actor, { eventType: 'PROFILE_IMAGE_CHANGED', targetType: 'profile', targetId: id, targetLabel: p.full_name, detail: 'Profile photograph updated' })
+    this.photoHook?.(id, null, 'avatar')
   }
 
   addGalleryImage(id: string, name: string, dataUrl: string, actor: Actor): string {
@@ -1057,6 +1061,7 @@ export class ProfilesService {
       imageId, id, 'gallery', name.slice(0, 200) || 'image', check.mime, check.bytes, dataUrl, actor.username, new Date().toISOString(),
     ])
     this.audit.record(actor, { eventType: 'ATTACHMENT_ADDED', targetType: 'profile', targetId: id, targetLabel: p.full_name, detail: `Image ${name}` })
+    this.photoHook?.(id, imageId, 'gallery')
     return imageId
   }
 
@@ -1085,6 +1090,7 @@ export class ProfilesService {
     if (!row) throw new AppError('NOT_FOUND', 'Image not found.')
     this.db.run('DELETE FROM profile_images WHERE id = ?', [imageId])
     this.audit.record(actor, { eventType: 'ATTACHMENT_REMOVED', targetType: 'profile', targetId: row.profile_id, detail: `Image ${row.name} removed` })
+    this.photoRemovedHook?.(row.profile_id, imageId, 'gallery')
   }
 
   // ---------- history & copy ----------

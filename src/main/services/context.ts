@@ -12,6 +12,8 @@ import { DashboardService } from './dashboard'
 import { UsersService } from './users'
 import { CategoriesService } from './categories'
 import { SearchService } from './search'
+import { PhotosService } from './photos'
+import { NlpService } from './nlp'
 import { TransferService } from './transfer'
 import { BackupService } from './backup'
 import { SecurityService } from './security'
@@ -37,6 +39,8 @@ export interface VaultContext {
   users: UsersService | null
   categories: CategoriesService | null
   search: SearchService | null
+  photos: PhotosService | null
+  nlp: NlpService | null
   transfer: TransferService | null
   backup: BackupService | null
   b2b: B2bService | null
@@ -58,6 +62,8 @@ export class AppContext {
   users: UsersService | null = null
   categories: CategoriesService | null = null
   search: SearchService | null = null
+  photos: PhotosService | null = null
+  nlp: NlpService | null = null
   transfer: TransferService | null = null
   backup: BackupService | null = null
   b2b: B2bService | null = null
@@ -130,6 +136,10 @@ export class AppContext {
     this.users = new UsersService(db, this.audit, this.settings, this.auth)
     this.categories = new CategoriesService(db, this.audit)
     this.search = new SearchService(db, this.profiles)
+    this.photos = new PhotosService(db)
+    this.nlp = new NlpService(db)
+    this.profiles!.photoHook = (profileId, imageId, kind) => this.photos!.enqueue(profileId, imageId, kind)
+    this.profiles!.photoRemovedHook = (profileId, imageId, kind) => this.photos!.removeToken(profileId, imageId, kind)
     this.transfer = new TransferService(db, this.profiles, this.audit, this.settings, vault.fieldKey, this.paths.exportsDir)
     this.backup = new BackupService(db, this.audit, this.settings, this.paths.backupsDir, () => vault.createEncryptedSnapshot())
     this.b2b = new B2bService(db, this.audit, this.paths.exportsDir)

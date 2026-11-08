@@ -34,7 +34,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
   backupRetention: 10,
   mcpEnabled: false,
   mcpPort: 7421,
+  exportFolderPreset: 'vault',
+  backupFolderPreset: 'vault',
 }
+
+export const FOLDER_PRESETS = [
+  { id: 'vault', label: 'Vault folder (internal)' },
+  { id: 'documents', label: 'Documents / Zeus Vault' },
+  { id: 'desktop', label: 'Desktop / Zeus Vault' },
+  { id: 'downloads', label: 'Downloads / Zeus Vault' },
+  { id: 'custom', label: 'Ask each time (save dialog)' },
+] as const
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: 'Administrator',

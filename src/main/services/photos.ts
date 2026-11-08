@@ -1,0 +1,246 @@
+// Local photo token service.
+// Tokens are computed once, at upload time, and stored. Image search scores
+// the QUERY image against stored tokens — it never re-decodes archive blobs.
+// The queue processes one image at a time and yields to the event loop so
+// batch tokenization never stresses the PC.
+import crypto from 'node:crypto'
+import type { Db } from '../db/sqlite'
+import { tokenizeImage, scoreToken, type PhotoToken, type PhotoMatch } from '../lib/vision'
+import { AppError } from '../lib/errors'
+import type { Actor } from './audit'
+
+export interface PhotoQueueStatus {
+  queued: number
+  processing: number
+  done: number
+  failed: number
+  current: string | null
+}
+
+interface TokenRow {
+  id: string
+  profile_id: string
+  image_id: string | null
+  kind: 'avatar' | 'gallery'
+  phash: string | null
+  ahash: string | null
+  face_detected: number
+  face_phash: string | null
+  face_box: string | null
+  histogram: string | null
+  status: 'queued' | 'processing' | 'done' | 'failed'
+  error: string | null
+  attempts: number
+}
+
+export class PhotosService {
+  private running = false
+  private currentName: string | null = null
+
+  constructor(private db: Db) {}
+
+  private rowToToken(r: TokenRow): PhotoToken | null {
+    if (!r.phash || !r.histogram) return null
+    try {
+      const hist = JSON.parse(r.histogram) as number[]
+      return {
+        phash: r.phash,
+        ahash: r.ahash ?? '',
+        histogram: hist,
+        faceDetected: r.face_detected === 1,
+        facePhash: r.face_phash ?? null,
+        faceBox: r.face_box ? (JSON.parse(r.face_box) as PhotoToken['faceBox']) : null,
+        width: 0,
+        height: 0,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  enqueue(profileId: string, imageId: string | null, kind: 'avatar' | 'gallery'): void {
+    const now = new Date().toISOString()
+    this.db.run(
+      `INSERT OR REPLACE INTO photo_tokens(id, profile_id, image_id, kind, status, created_at, updated_at)
+       VALUES (?,?,?,?, 'queued', ?, ?)
+       ON CONFLICT(profile_id, image_id, kind) DO UPDATE SET status='queued', error=NULL, updated_at=excluded.updated_at`,
+      [crypto.randomUUID(), profileId, imageId, kind, now, now],
+    )
+    void this.kick()
+  }
+
+  removeToken(profileId: string, imageId: string | null, kind: 'avatar' | 'gallery'): void {
+    this.db.run('DELETE FROM photo_tokens WHERE profile_id = ? AND image_id IS ? AND kind = ?', [profileId, imageId, kind])
+  }
+
+  enqueueAllProfiles(): { queued: number } {
+    const profiles = this.db.all<{ id: string; avatar_blob: string | null }>(
+      'SELECT id, avatar_blob FROM profiles WHERE deleted_at IS NULL AND avatar_blob IS NOT NULL',
+    )
+    const gallery = this.db.all<{ id: string; profile_id: string }>('SELECT id, profile_id FROM profile_images WHERE kind = ? ', ['gallery'])
+    const done = new Set(this.db.all<{ profile_id: string; image_id: string | null; kind: string }>(`SELECT profile_id, image_id, kind FROM photo_tokens WHERE status='done'`).map((r) => `${r.profile_id}|${r.image_id ?? ''}|${r.kind}`))
+    const now = new Date().toISOString()
+    const upsert = (profileId: string, imageId: string | null, kind: string) => {
+      this.db.run(
+        `INSERT OR REPLACE INTO photo_tokens(id, profile_id, image_id, kind, status, created_at, updated_at)
+         VALUES (?,?,?,?, 'queued', ?, ?)
+         ON CONFLICT(profile_id, image_id, kind) DO UPDATE SET status='queued', error=NULL, updated_at=excluded.updated_at`,
+        [crypto.randomUUID(), profileId, imageId, kind, now, now],
+      )
+    }
+    let n = 0
+    for (const p of profiles) {
+      if (done.has(`${p.id}||avatar`)) continue
+      upsert(p.id, null, 'avatar')
+      n++
+    }
+    for (const g of gallery) {
+      if (done.has(`${g.profile_id}|${g.id}|gallery`)) continue
+      upsert(g.profile_id, g.id, 'gallery')
+      n++
+    }
+    void this.kick()
+    return { queued: n }
+  }
+
+  status(actor: Actor): PhotoQueueStatus {
+    void actor
+    const counts = this.db.all<{ status: string; c: number }>('SELECT status, COUNT(*) c FROM photo_tokens GROUP BY status')
+    const out: PhotoQueueStatus = { queued: 0, processing: 0, done: 0, failed: 0, current: this.currentName }
+    for (const r of counts) {
+      const key = String(r.status) as 'queued' | 'processing' | 'done' | 'failed'
+      if (key === 'queued' || key === 'processing' || key === 'done' || key === 'failed') out[key] = Number(r.c)
+    }
+    return out
+  }
+
+  private async kick(): Promise<void> {
+    if (this.running) return
+    this.running = true
+    try {
+      let row = this.db.get<TokenRow>(`SELECT * FROM photo_tokens WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1`)
+      while (row) {
+        this.currentName = this.profileName(row.profile_id)
+        this.db.run(`UPDATE photo_tokens SET status='processing', updated_at=? WHERE id=?`, [new Date().toISOString(), row.id])
+        try {
+          const dataUrl = this.imageDataUrl(row.profile_id, row.image_id, row.kind)
+          if (!dataUrl) throw new Error('Image no longer exists')
+          const token = await tokenizeImage(dataUrl)
+          this.db.run(
+            `UPDATE photo_tokens SET phash=?, ahash=?, face_detected=?, face_phash=?, face_box=?, histogram=?, status='done', error=NULL, attempts=attempts+1, updated_at=? WHERE id=?`,
+            [
+              token.phash,
+              token.ahash,
+              token.faceDetected ? 1 : 0,
+              token.facePhash,
+              token.faceBox ? JSON.stringify(token.faceBox) : null,
+              JSON.stringify(token.histogram),
+              new Date().toISOString(),
+              row.id,
+            ],
+          )
+        } catch (e) {
+          this.db.run(`UPDATE photo_tokens SET status='failed', error=?, attempts=attempts+1, updated_at=? WHERE id=?`, [
+            e instanceof Error ? e.message.slice(0, 200) : String(e),
+            new Date().toISOString(),
+            row.id,
+          ])
+        }
+        await new Promise((r) => setTimeout(r, 25))
+        row = this.db.get<TokenRow>(`SELECT * FROM photo_tokens WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1`)
+      }
+    } finally {
+      this.running = false
+      this.currentName = null
+    }
+  }
+
+  private profileName(id: string): string | null {
+    const r = this.db.get<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ?', [id])
+    return r?.full_name ?? null
+  }
+
+  private imageDataUrl(profileId: string, imageId: string | null, kind: string): string | null {
+    if (kind === 'avatar' || !imageId) {
+      const r = this.db.get<{ avatar_blob: string | null }>('SELECT avatar_blob FROM profiles WHERE id = ?', [profileId])
+      return r?.avatar_blob ?? null
+    }
+    const r = this.db.get<{ blob: string }>('SELECT blob FROM profile_images WHERE id = ? AND profile_id = ?', [imageId, profileId])
+    return r?.blob ?? null
+  }
+
+  async search(queryDataUrl: string, filters: { view?: string; categoryId?: string; country?: string; text?: string; minScore?: number } = {}): Promise<{ query: PhotoToken['phash']; faceDetected: boolean; matches: PhotoMatch[] }> {
+    if (!queryDataUrl) throw new AppError('VALIDATION', 'Provide a query image.')
+    const allowed = this.allowedProfileIds(filters)
+    const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
+    const query = await tokenizeImage(queryDataUrl)
+    const matches: PhotoMatch[] = []
+    for (const r of rows) {
+      if (allowed && !allowed.has(r.profile_id)) continue
+      const t = this.rowToToken(r)
+      if (!t) continue
+      const s = scoreToken(query, t)
+      if (s.score < (filters.minScore ?? 40)) continue
+      matches.push({ tokenId: r.id, profileId: r.profile_id, kind: r.kind, score: s.score, phashSim: s.phashSim, histSim: s.histSim, faceSim: s.faceSim, faceDetected: t.faceDetected })
+    }
+    matches.sort((a, b) => b.score - a.score)
+    return { query: query.phash, faceDetected: query.faceDetected, matches: matches.slice(0, 100) }
+  }
+
+  async matchFace(cropDataUrl: string): Promise<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]> {
+    if (!cropDataUrl) throw new AppError('VALIDATION', 'Provide a face crop.')
+    const q = await tokenizeImage(cropDataUrl)
+    const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
+    const best = new Map<string, { profileId: string; score: number; phashSim: number; faceSim: number | null }>()
+    for (const r of rows) {
+      const t = this.rowToToken(r)
+      if (!t) continue
+      const s = scoreToken(q, t)
+      const prev = best.get(r.profile_id)
+      if (!prev || s.score > prev.score) {
+        best.set(r.profile_id, { profileId: r.profile_id, score: s.score, phashSim: s.phashSim, faceSim: s.faceSim })
+      }
+    }
+    const ranked = [...best.values()].filter((m) => m.score >= 40).sort((a, b) => b.score - a.score).slice(0, 5)
+    return ranked.map((m) => {
+      const p = this.db.get<{ full_name: string; profile_code: string; avatar_blob: string | null }>('SELECT full_name, profile_code, avatar_blob FROM profiles WHERE id = ?', [m.profileId])
+      return { ...m, name: p?.full_name ?? 'Unknown', code: p?.profile_code ?? '', avatar: p?.avatar_blob ?? null }
+    })
+  }
+
+  private allowedProfileIds(filters: { view?: string; categoryId?: string; country?: string; text?: string }): Set<string> | null {
+    const clauses = ['deleted_at IS NULL']
+    const params: (string)[] = []
+    if (filters.view === 'archived' || filters.view === 'active') {
+      clauses.push('status = ?')
+      params.push(filters.view)
+    }
+    if (filters.categoryId) {
+      clauses.push('category_id = ?')
+      params.push(filters.categoryId)
+    }
+    if (filters.country) {
+      clauses.push('(country LIKE ? OR country_iso2 = ?)')
+      params.push(`%${filters.country}%`, filters.country)
+    }
+    if (filters.text?.trim()) {
+      clauses.push('(full_name LIKE ? OR username LIKE ? OR tags_text LIKE ?)')
+      params.push(`%${filters.text.trim()}%`, `%${filters.text.trim()}%`, `%${filters.text.trim()}%`)
+    }
+    const rows = this.db.all<{ id: string }>(`SELECT id FROM profiles WHERE ${clauses.join(' AND ')}`, params)
+    return new Set(rows.map((r) => r.id))
+  }
+
+  profileTokens(profileId: string): { kind: string; status: string; faceDetected: boolean; phash: string | null }[] {
+    return this.db
+      .all<TokenRow>('SELECT * FROM photo_tokens WHERE profile_id = ? ORDER BY kind, created_at', [profileId])
+      .map((r) => ({ kind: r.kind, status: r.status, faceDetected: r.face_detected === 1, phash: r.phash }))
+  }
+
+  async recheck(profileId: string): Promise<{ phash: string; faceDetected: boolean }> {
+    const r = this.db.get<{ avatar_blob: string | null }>('SELECT avatar_blob FROM profiles WHERE id = ?', [profileId])
+    if (!r?.avatar_blob) throw new AppError('NOT_FOUND', 'Profile has no photograph.')
+    const t = await tokenizeImage(r.avatar_blob)
+    return { phash: t.phash, faceDetected: t.faceDetected }
+  }
+}

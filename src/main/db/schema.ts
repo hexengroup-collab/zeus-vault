@@ -490,6 +490,45 @@ export const MIGRATIONS: Migration[] = [
       `)
     },
   },
+  {
+    version: 6,
+    name: 'photo-tokens-nlp-embeddings',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS photo_tokens (
+          id TEXT PRIMARY KEY,
+          profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          image_id TEXT,
+          kind TEXT NOT NULL CHECK (kind IN ('avatar','gallery')),
+          phash TEXT,
+          ahash TEXT,
+          face_detected INTEGER NOT NULL DEFAULT 0,
+          face_phash TEXT,
+          face_box TEXT,
+          histogram TEXT,
+          status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','processing','done','failed')),
+          error TEXT,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_photo_tokens_profile ON photo_tokens(profile_id);
+        CREATE INDEX IF NOT EXISTS idx_photo_tokens_status ON photo_tokens(status);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_photo_tokens_unique ON photo_tokens(profile_id, image_id, kind);
+        CREATE TABLE IF NOT EXISTS nlp_aliases (
+          alias_lower TEXT PRIMARY KEY,
+          canonical TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          updated_by TEXT
+        );
+        CREATE TABLE IF NOT EXISTS text_embeddings (
+          profile_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+          vector TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `)
+    },
+  },
 ]
 
 export function migrate(db: Db): { version: number; applied: number[] } {

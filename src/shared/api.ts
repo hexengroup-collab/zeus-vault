@@ -89,6 +89,19 @@ export interface ZeusApi {
   nlp: {
     extract: (text: string) => Promise<ApiResult<NlpExtractResult>>
     interpret: (text: string) => Promise<ApiResult<SearchInterpretation>>
+    aliases: () => Promise<ApiResult<import('./types').NlpAlias[]>>
+    addAlias: (payload: { alias: string; canonical: string }) => Promise<ApiResult<null>>
+    deleteAlias: (alias: string) => Promise<ApiResult<null>>
+    embedAll: () => Promise<ApiResult<{ embedded: number }>>
+    semantic: (text: string) => Promise<ApiResult<{ profileId: string; score: number }[]>>
+  }
+  photos: {
+    status: () => Promise<ApiResult<import('./types').PhotoQueueStatus>>
+    enqueueAll: () => Promise<ApiResult<{ queued: number }>>
+    search: (payload: { dataUrl: string; view?: string; categoryId?: string; country?: string; text?: string; minScore?: number }) => Promise<ApiResult<{ query: string; faceDetected: boolean; matches: import('./types').PhotoMatch[] }>>
+    recheck: (profileId: string) => Promise<ApiResult<{ phash: string; faceDetected: boolean }>>
+    profile: (profileId: string) => Promise<ApiResult<{ kind: string; status: string; faceDetected: boolean; phash: string | null }[]>>
+    matchFace: (cropDataUrl: string) => Promise<ApiResult<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]>>
   }
   categories: {
     list: () => Promise<ApiResult<CategoryRecord[]>>

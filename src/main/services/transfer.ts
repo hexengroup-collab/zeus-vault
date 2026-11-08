@@ -10,6 +10,7 @@ import type { AuditService } from './audit'
 import type { ProfilesService } from './profiles'
 import type { SettingsService } from './settings'
 import { AppError } from '../lib/errors'
+import { presetDir, ensureWritableDir } from '../lib/vision'
 import { FIELD_ALIASES } from '../nlp/engine'
 import type { ImportPreview, ImportResult, ProfileDetail, ProfileInput, ProfileListItem } from '../../shared/types'
 import { fullAddress } from './profiles'
@@ -255,7 +256,8 @@ export class TransferService {
     const columns = opts.includeSensitive ? [...EXPORT_COLUMNS, { header: 'Password', key: 'password' }] : EXPORT_COLUMNS
     const rows = this.exportRows(list, opts.includeSensitive, actor, opts.categoryNames)
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const base = opts.targetPath ?? path.join(this.exportsDir, `zeus-vault-export-${stamp}`)
+    const dir = s.exportFolderPreset && s.exportFolderPreset !== 'vault' && s.exportFolderPreset !== 'custom' ? ensureWritableDir(presetDir(s.exportFolderPreset, this.exportsDir, this.exportsDir, 'exports')) : this.exportsDir
+    const base = opts.targetPath ?? path.join(dir, `zeus-vault-export-${stamp}`)
     const wantFile = (ext: string) => (base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`)
 
     let filePath: string
@@ -294,9 +296,11 @@ export class TransferService {
   async exportDossierPdf(profileId: string, includeSensitive: boolean, actor: Actor, targetPath?: string): Promise<{ filePath: string }> {
     const d = this.profiles.get(profileId, actor, { trackView: false })
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const s = this.settings.get()
+    const dir = s.exportFolderPreset && s.exportFolderPreset !== 'vault' && s.exportFolderPreset !== 'custom' ? ensureWritableDir(presetDir(s.exportFolderPreset, this.exportsDir, this.exportsDir, 'exports')) : this.exportsDir
     const filePath = targetPath && targetPath.toLowerCase().endsWith('.pdf')
       ? targetPath
-      : path.join(this.exportsDir, `dossier-${d.profileCode}-${stamp}.pdf`)
+      : path.join(dir, `dossier-${d.profileCode}-${stamp}.pdf`)
     const bytes = await buildDossierPdf(d, includeSensitive)
     fs.writeFileSync(filePath, Buffer.from(bytes))
     this.audit.record(actor, {
