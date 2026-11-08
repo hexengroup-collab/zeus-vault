@@ -4,6 +4,7 @@ import { Image as ImageIcon, ScanFace, Users } from 'lucide-react'
 import { call, zeus } from '@/lib/api'
 import { detectPeople, type DetectedFace } from '@/lib/facefinder'
 import { toastError, toastOk } from '@/stores/toast'
+import type { ProfileListItem } from '@shared/types'
 
 const FEATURE_POINTS = [1, 33, 263, 468, 473, 61, 291, 199, 90, 13, 14, 234, 454, 127, 356]
 const BOX_COLORS = ['#E34B64', '#5F8FB0', '#4F8A6B', '#D69B45', '#8A7FB0', '#7A8B9A', '#C86F4A']
@@ -18,6 +19,39 @@ export function PersonFinder() {
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState<number | null>(null)
   const [modelStatus, setModelStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [saveFor, setSaveFor] = useState<number | null>(null)
+  const [pickerQuery, setPickerQuery] = useState('')
+  const [candidates, setCandidates] = useState<ProfileListItem[]>([])
+
+  const openPicker = (i: number) => {
+    setSaveFor(i)
+    setPickerQuery('')
+    setCandidates([])
+  }
+
+  const searchProfiles = async (q: string) => {
+    setPickerQuery(q)
+    if (!q.trim()) {
+      setCandidates([])
+      return
+    }
+    try {
+      const r = await call(zeus.profiles.list({ search: q.trim().slice(0, 60), view: 'all-status', page: 1, pageSize: 8 }))
+      setCandidates(r.rows)
+    } catch {
+      setCandidates([])
+    }
+  }
+
+  const saveFaceTo = async (face: DetectedFace, profile: ProfileListItem) => {
+    try {
+      await call(zeus.photos.saveFace({ profileId: profile.id, cropDataUrl: face.crop }))
+      toastOk('Face saved', `${face.match ? 'updated' : 'new'} reference under ${profile.fullName} (${profile.profileCode})`)
+      setSaveFor(null)
+    } catch (e) {
+      toastError('Save failed', e instanceof Error ? e.message : undefined)
+    }
+  }
 
   const onFile = async (file: File | undefined) => {
     if (!file) return
@@ -129,19 +163,36 @@ export function PersonFinder() {
 
           <div className="mt-4 space-y-1.5">
             {faces.map((f, i) => (
-              <button
-                key={f.index}
-                onMouseEnter={() => setHover(f.index)}
-                onMouseLeave={() => setHover(null)}
-                onClick={() => f.match && navigate(`/profiles/${f.match.profileId}`)}
-                className={`flex w-full items-center justify-between border px-3 py-2 text-left transition-colors ${f.match ? 'border-white/[0.08] bg-white/[0.02] hover:border-vault-red/40' : 'border-white/[0.05] opacity-70'}`}
-              >
-                <span className="font-mono text-[10px] text-vault-text2">
-                  <span style={{ color: BOX_COLORS[i % BOX_COLORS.length] }}>■</span> Face #{f.index + 1}
-                  {f.match ? <span className="text-vault-text"> — {f.match.name} <span className="text-vault-muted">({f.match.code})</span></span> : <span> — no archive match</span>}
-                </span>
-                {f.match && <span className="font-mono text-[11px] font-bold text-vault-red">{f.match.score.toFixed(1)}%</span>}
-              </button>
+              <div key={f.index} onMouseEnter={() => setHover(f.index)} onMouseLeave={() => setHover(null)} className={`border px-3 py-2 transition-colors ${f.match ? 'border-white/[0.08] bg-white/[0.02]' : 'border-white/[0.05]'} ${hover === f.index ? 'border-vault-red/40' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <button onClick={() => f.match && navigate(`/profiles/${f.match.profileId}`)} className="min-w-0 flex-1 text-left">
+                    <span className="font-mono text-[10px] text-vault-text2">
+                      <span style={{ color: BOX_COLORS[i % BOX_COLORS.length] }}>■</span> Face #{f.index + 1}
+                      {f.match ? <span className="text-vault-text"> — {f.match.score >= 85 ? f.match.name : f.match.score >= 70 ? `~${f.match.name}` : 'no confident match'} <span className="text-vault-muted">({f.match.code})</span></span> : <span> — new person</span>}
+                    </span>
+                  </button>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {f.match && <span className="font-mono text-[11px] font-bold text-vault-red">{f.match.score.toFixed(1)}%</span>}
+                    <span role="button" tabIndex={0} className={`font-mono text-[9px] uppercase tracking-[0.18em] ${saveFor === f.index ? 'text-vault-red' : 'text-vault-muted hover:text-vault-text'}`} onClick={() => openPicker(f.index)}>
+                      {f.match ? 'Save as reference' : 'Save to dossier'}
+                    </span>
+                  </span>
+                </div>
+                {saveFor === f.index && (
+                  <div className="mt-2 border-t border-white/[0.06] pt-2">
+                    <input autoFocus value={pickerQuery} onChange={(e) => void searchProfiles(e.target.value)} placeholder="Search a dossier to store this face under…" className="vault-input h-9 w-full px-2 text-[11px]" />
+                    <div className="mt-1.5 space-y-1">
+                      {candidates.map((c) => (
+                        <button key={c.id} onClick={() => void saveFaceTo(f, c)} className="flex w-full items-center justify-between border border-white/[0.06] px-2 py-1.5 text-left hover:border-vault-red/40">
+                          <span className="text-[11px] text-vault-text2">{c.fullName}</span>
+                          <span className="font-mono text-[8px] text-vault-muted">{c.profileCode}</span>
+                        </button>
+                      ))}
+                      {candidates.length === 0 && <div className="font-mono text-[9px] text-vault-muted">Type at least 2 characters…</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
           <p className="mt-3 text-center font-mono text-[8px] uppercase tracking-[0.25em] text-vault-muted">Hover a face to inspect · click a matched person to open their dossier</p>

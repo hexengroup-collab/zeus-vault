@@ -43,14 +43,10 @@ export function ImageSearch() {
     }
   }, [])
 
-  const onFile = async (file: File | undefined) => {
-    if (!file) return
+  const runSearch = async (url: string) => {
+    setMatches([])
+    setSearching(true)
     try {
-      const url = await fileToDataUrl(file, 512, 0.85)
-      setPreview(URL.createObjectURL(file))
-      setDataUrl(url)
-      setMatches([])
-      setSearching(true)
       const r = await call(zeus.photos.search({ dataUrl: url, view: view === 'all-status' ? undefined : view, text: text || undefined }))
       setFaceDetected(r.faceDetected)
       setMatches(r.matches)
@@ -63,6 +59,18 @@ export function ImageSearch() {
       toastError('Image search failed', e instanceof Error ? e.message : undefined)
     } finally {
       setSearching(false)
+    }
+  }
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      const url = await fileToDataUrl(file, 512, 0.85)
+      setPreview(URL.createObjectURL(file))
+      setDataUrl(url)
+      await runSearch(url)
+    } catch (e) {
+      toastError('Image search failed', e instanceof Error ? e.message : undefined)
     }
   }
 
@@ -106,7 +114,7 @@ export function ImageSearch() {
           <button
             className="vault-btn vault-btn-primary h-10"
             disabled={!dataUrl || searching}
-            onClick={() => dataUrl && void onFile(new File([], 'x'))}
+            onClick={() => dataUrl && void runSearch(dataUrl)}
           >
             <ScanFace size={13} /> {searching ? 'Matching…' : 'Search again'}
           </button>

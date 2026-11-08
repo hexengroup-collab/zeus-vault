@@ -268,6 +268,21 @@ export class PhotosService {
       .map((r) => ({ kind: r.kind, status: r.status, faceDetected: r.face_detected === 1, phash: r.phash }))
   }
 
+  async saveFace(profileId: string, cropDataUrl: string): Promise<{ tokenId: string }> {
+    const p = this.db.get<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ? AND deleted_at IS NULL', [profileId])
+    if (!p) throw new AppError('NOT_FOUND', 'Profile not found.')
+    if (!cropDataUrl) throw new AppError('VALIDATION', 'Provide a face crop.')
+    const token = await tokenizeImage(cropDataUrl)
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    this.db.run(
+      `INSERT INTO photo_tokens(id, profile_id, image_id, kind, phash, ahash, face_detected, face_phash, face_box, histogram, status, attempts, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'done', 1, ?, ?)`,
+      [id, profileId, null, 'gallery', token.phash, token.ahash, token.faceDetected ? 1 : 0, token.facePhash, token.faceBox ? JSON.stringify(token.faceBox) : null, JSON.stringify(token.histogram), now, now],
+    )
+    return { tokenId: id }
+  }
+
   async recheck(profileId: string): Promise<{ phash: string; faceDetected: boolean }> {
     const r = this.db.get<{ avatar_blob: string | null }>('SELECT avatar_blob FROM profiles WHERE id = ?', [profileId])
     if (!r?.avatar_blob) throw new AppError('NOT_FOUND', 'Profile has no photograph.')
