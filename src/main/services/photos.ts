@@ -228,23 +228,26 @@ export class PhotosService {
     if (geom && geom.length) q.faceGeom = geom
     // Descriptor distance (ageitgey semantics): identity is decided here.
     const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
-    const best = new Map<string, { profileId: string; score: number; phashSim: number; faceSim: number | null }>()
+    const best = new Map<string, { profileId: string; score: number; distance: number | null; phashSim: number; faceSim: number | null }>()
     for (const r of rows) {
       const t = this.rowToToken(r)
       if (!t) continue
-      let s = scoreFaceToken(q, t)
+      const base = scoreFaceToken(q, t)
       let arcDesc: number[] | null = null
       if (r.face_desc) {
         try { arcDesc = JSON.parse(r.face_desc) as number[] } catch { arcDesc = null }
       }
       const d = desc?.length ? descriptorDistance(desc, arcDesc) : null
+      let s = base
+      let distance: number | null = null
       if (desc?.length) {
         if (d === null || d > DESCRIPTOR_TOLERANCE) continue
-        s = { score: Math.round((1 - d) * 1000) / 10, phashSim: s.phashSim, faceSim: Math.round((1 - d) * 100) }
+        distance = d
+        s = { score: Math.round((1 - d) * 1000) / 10, phashSim: base.phashSim, faceSim: Math.round((1 - d) * 50) }
       }
       const prev = best.get(r.profile_id)
       if (!prev || s.score > prev.score) {
-        best.set(r.profile_id, { profileId: r.profile_id, score: s.score, phashSim: s.phashSim, faceSim: s.faceSim })
+        best.set(r.profile_id, { profileId: r.profile_id, score: s.score, distance, phashSim: s.phashSim, faceSim: s.faceSim })
       }
     }
     const ranked = [...best.values()].filter((m) => m.score >= 70).sort((a, b) => b.score - a.score).slice(0, 3)
