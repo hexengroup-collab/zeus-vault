@@ -45,7 +45,7 @@ export function PersonFinder() {
 
   const saveFaceTo = async (face: DetectedFace, profile: ProfileListItem) => {
     try {
-      await call(zeus.photos.saveFace({ profileId: profile.id, cropDataUrl: face.crop }))
+      await call(zeus.photos.saveFace({ profileId: profile.id, cropDataUrl: face.crop, geom: face.geom ?? undefined }))
       toastOk('Face saved', `${face.match ? 'updated' : 'new'} reference under ${profile.fullName} (${profile.profileCode})`)
       setSaveFor(null)
     } catch (e) {
@@ -73,7 +73,7 @@ export function PersonFinder() {
       const withMatch = await Promise.all(
         r.faces.map(async (f) => {
           try {
-            const hits = await call(zeus.photos.matchFace(f.crop))
+            const hits = await call(zeus.photos.matchFace({ cropDataUrl: f.crop, geom: f.geom ?? undefined }))
             const best = hits[0]
             return best ? { ...f, match: { profileId: best.profileId, score: best.score, name: best.name, code: best.code } } : f
           } catch {

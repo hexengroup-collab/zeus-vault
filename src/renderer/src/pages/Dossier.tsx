@@ -162,6 +162,14 @@ export function Dossier() {
         } else {
           await call(zeus.profiles.addGalleryImage({ id: d.id, name: file.name, dataUrl }))
           toastOk('Image added', file.name)
+          // Capture face geometry from the new image (best-effort, local).
+          try {
+            const { captureGeometry } = await import('@/lib/facefinder')
+            const geom = await captureGeometry(dataUrl)
+            if (geom) await call(zeus.photos.saveGeom({ profileId: d.id, geom, kind: 'gallery' }))
+          } catch {
+            /* geometry capture is optional */
+          }
         }
         await reload()
       } catch (err) {

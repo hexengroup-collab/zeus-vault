@@ -5,7 +5,7 @@
 // batch tokenization never stresses the PC.
 import crypto from 'node:crypto'
 import type { Db } from '../db/sqlite'
-import { tokenizeImage, scoreToken, scoreFaceToken, type PhotoToken, type PhotoMatch } from '../lib/vision'
+import { tokenizeImage, scoreToken, scoreFaceToken, cosineSim, type PhotoToken, type PhotoMatch } from '../lib/vision'
 import { AppError } from '../lib/errors'
 import type { Actor } from './audit'
 
@@ -28,6 +28,7 @@ interface TokenRow {
   face_detected: number
   face_phash: string | null
   face_box: string | null
+  face_geom: string | null
   histogram: string | null
   status: 'queued' | 'processing' | 'done' | 'failed'
   error: string | null
@@ -44,6 +45,7 @@ export class PhotosService {
     if (!r.phash || !r.histogram) return null
     try {
       const hist = JSON.parse(r.histogram) as number[]
+      const geom = r.face_geom ? (JSON.parse(r.face_geom) as number[]) : null
       return {
         phash: r.phash,
         ahash: r.ahash ?? '',
@@ -51,6 +53,7 @@ export class PhotosService {
         faceDetected: r.face_detected === 1,
         facePhash: r.face_phash ?? null,
         faceBox: r.face_box ? (JSON.parse(r.face_box) as PhotoToken['faceBox']) : null,
+        faceGeom: geom,
         width: 0,
         height: 0,
       }
@@ -216,17 +219,20 @@ export class PhotosService {
     return { query: query.phash, faceDetected: query.faceDetected, matches: matches.filter((m) => m.score >= cutoff).slice(0, 12) }
   }
 
-  async matchFace(cropDataUrl: string): Promise<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]> {
+  async matchFace(cropDataUrl: string, geom: number[] | null = null): Promise<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]> {
     if (!cropDataUrl) throw new AppError('VALIDATION', 'Provide a face crop.')
     const q = await tokenizeImage(cropDataUrl)
-    // Person matching is FACE-ONLY: background, clothing, and whole-photo
-    // hashes are ignored so unrelated people stop matching.
+    if (geom && geom.length) q.faceGeom = geom
+    // Person matching is FACE-ONLY: measured face geometry dominates.
     const rows = this.db.all<TokenRow>(`SELECT * FROM photo_tokens WHERE status='done' AND phash IS NOT NULL`)
     const best = new Map<string, { profileId: string; score: number; phashSim: number; faceSim: number | null }>()
     for (const r of rows) {
       const t = this.rowToToken(r)
       if (!t) continue
       const s = scoreFaceToken(q, t)
+      const g = cosineSim(q.faceGeom, t.faceGeom)
+      const blended = g !== null ? 0.85 * g + 0.15 * s.score / 100 : s.score / 100
+      s.score = Math.round(blended * 1000) / 10
       const prev = best.get(r.profile_id)
       if (!prev || s.score > prev.score) {
         best.set(r.profile_id, { profileId: r.profile_id, score: s.score, phashSim: s.phashSim, faceSim: s.faceSim })
@@ -268,7 +274,15 @@ export class PhotosService {
       .map((r) => ({ kind: r.kind, status: r.status, faceDetected: r.face_detected === 1, phash: r.phash }))
   }
 
-  async saveFace(profileId: string, cropDataUrl: string): Promise<{ tokenId: string }> {
+  saveGeom(profileId: string, geom: number[], kind: 'avatar' | 'gallery' | 'attachment' = 'avatar'): void {
+    if (!geom?.length) throw new AppError('VALIDATION', 'Provide face geometry.')
+    const r = this.db.get<{ id: string }>('SELECT id FROM photo_tokens WHERE profile_id=? AND status=? AND phash IS NOT NULL ORDER BY (kind=?) DESC, updated_at DESC LIMIT 1', [profileId, 'done', kind])
+    if (r?.id) {
+      this.db.run('UPDATE photo_tokens SET face_geom=?, face_detected=1, updated_at=? WHERE id=?', [JSON.stringify(geom), new Date().toISOString(), r.id])
+    }
+  }
+
+  async saveFace(profileId: string, cropDataUrl: string, geom: number[] | null = null): Promise<{ tokenId: string }> {
     const p = this.db.get<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ? AND deleted_at IS NULL', [profileId])
     if (!p) throw new AppError('NOT_FOUND', 'Profile not found.')
     if (!cropDataUrl) throw new AppError('VALIDATION', 'Provide a face crop.')
@@ -276,9 +290,9 @@ export class PhotosService {
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     this.db.run(
-      `INSERT INTO photo_tokens(id, profile_id, image_id, kind, phash, ahash, face_detected, face_phash, face_box, histogram, status, attempts, created_at, updated_at)
+      `INSERT INTO photo_tokens(id, profile_id, image_id, kind, phash, ahash, face_detected, face_phash, face_box, face_geom, histogram, status, attempts, created_at, updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'done', 1, ?, ?)`,
-      [id, profileId, null, 'gallery', token.phash, token.ahash, token.faceDetected ? 1 : 0, token.facePhash, token.faceBox ? JSON.stringify(token.faceBox) : null, JSON.stringify(token.histogram), now, now],
+      [id, profileId, null, 'gallery', token.phash, token.ahash, token.faceDetected ? 1 : 0, token.facePhash, token.faceBox ? JSON.stringify(token.faceBox) : null, geom?.length ? JSON.stringify(geom) : null, JSON.stringify(token.histogram), now, now],
     )
     return { tokenId: id }
   }

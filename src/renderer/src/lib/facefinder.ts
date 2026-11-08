@@ -5,7 +5,22 @@ export interface DetectedFace {
   box: { x: number; y: number; w: number; h: number }
   landmarks: { x: number; y: number }[]
   crop: string
+  geom: number[] | null
   match: { profileId: string; score: number; name: string; code: string } | null
+}
+
+const IO_A = 133
+const IO_B = 362
+const ANCHORS = [1, 152, 61, 291, 13, 14, 127, 356, 10, 234, 454, 168]
+export function faceGeometry(lm: { x: number; y: number }[]): number[] | null {
+  if (!lm || lm.length < 479) return null
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+  const io = dist(lm[IO_A], lm[IO_B])
+  if (!Number.isFinite(io) || io < 1e-6) return null
+  const mid = { x: (lm[IO_A].x + lm[IO_B].x) / 2, y: (lm[IO_A].y + lm[IO_B].y) / 2 }
+  const out = ANCHORS.map((i) => Math.round((dist(lm[i], mid) / io) * 10000) / 10000)
+  out.push(Math.round((dist(lm[61], lm[291]) / io) * 10000) / 10000, Math.round((dist(lm[1], lm[IO_A]) / io) * 10000) / 10000)
+  return out
 }
 
 let landmarkerPromise: Promise<unknown> | null = null
@@ -56,6 +71,11 @@ export function cropFace(img: HTMLImageElement, box: { x: number; y: number; w: 
   return canvas.toDataURL('image/jpeg', 0.85)
 }
 
+export async function captureGeometry(imageSrc: string): Promise<number[] | null> {
+  const { faces } = await detectPeople(imageSrc)
+  return faces.length > 0 ? faces[0].geom ?? null : null
+}
+
 export async function detectPeople(imageSrc: string): Promise<{ faces: DetectedFace[]; tess: { start: number; end: number }[]; width: number; height: number }> {
   const img = await loadImage(imageSrc)
   const { landmarker, tess } = await getLandmarker()
@@ -79,7 +99,7 @@ export async function detectPeople(imageSrc: string): Promise<{ faces: DetectedF
       w: Math.min(img.naturalWidth, (maxX - minX + pad * 2) * img.naturalWidth),
       h: Math.min(img.naturalHeight, (maxY - minY + pad * 2) * img.naturalHeight),
     }
-    faces.push({ index: faces.length, box, landmarks: lm, crop: cropFace(img, box), match: null })
+    faces.push({ index: faces.length, box, landmarks: lm, crop: cropFace(img, box), geom: faceGeometry(lm), match: null })
   }
   return { faces, tess, width: img.naturalWidth, height: img.naturalHeight }
 }

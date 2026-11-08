@@ -15,6 +15,7 @@ export interface PhotoToken {
   faceDetected: boolean
   facePhash: string | null
   faceBox: { x: number; y: number; w: number; h: number } | null
+  faceGeom: number[] | null
   width: number
   height: number
 }
@@ -187,6 +188,7 @@ export async function tokenizeImage(dataUrl: string): Promise<PhotoToken> {
     faceDetected: faceBox !== null,
     facePhash,
     faceBox,
+    faceGeom: null,
     width: meta32.width,
     height: meta32.height,
   }
@@ -231,6 +233,43 @@ export function scoreFaceToken(q: PhotoToken, t: PhotoToken): { score: number; p
     return { score: Math.round(faceSim * 1000) / 10, phashSim: Math.round(phashSim * 100), faceSim: Math.round(faceSim * 100) }
   }
   return { score: Math.round(phashSim * 1000) / 10, phashSim: Math.round(phashSim * 100), faceSim: null }
+}
+
+// Face geometry: relative distances between anatomical anchors, normalized
+// by inter-ocular distance so size and position do not matter.
+const IO_A = 133
+const IO_B = 362
+const ANCHORS = [1, 152, 61, 291, 13, 14, 127, 356, 10, 234, 454, 168]
+export function biometricsFromLandmarks(lm: { x: number; y: number }[]): number[] | null {
+  if (!lm || lm.length < 479) return null
+  const pt = (i: number) => lm[i]
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+  const io = dist(pt(IO_A), pt(IO_B))
+  if (!Number.isFinite(io) || io < 1e-6) return null
+  const out: number[] = []
+  for (const i of ANCHORS) {
+    const p = pt(i)
+    const mid = { x: (pt(IO_A).x + pt(IO_B).x) / 2, y: (pt(IO_A).y + pt(IO_B).y) / 2 }
+    out.push(dist(p, mid) / io)
+  }
+  const mouthW = dist(pt(61), pt(291)) / io
+  const noseEye = dist(pt(1), pt(IO_A)) / io
+  out.push(mouthW, noseEye)
+  return out.map((v) => Math.round(v * 10000) / 10000)
+}
+
+export function cosineSim(a: number[] | null, b: number[] | null): number | null {
+  if (!a || !b || a.length !== b.length || a.length === 0) return null
+  let dot = 0
+  let na = 0
+  let nb = 0
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i]
+    na += a[i] * a[i]
+    nb += b[i] * b[i]
+  }
+  if (na === 0 || nb === 0) return null
+  return dot / (Math.sqrt(na) * Math.sqrt(nb))
 }
 
 export type FolderPreset = 'vault' | 'documents' | 'desktop' | 'downloads' | 'custom'

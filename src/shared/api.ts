@@ -101,8 +101,9 @@ export interface ZeusApi {
     search: (payload: { dataUrl: string; view?: string; categoryId?: string; country?: string; text?: string; minScore?: number }) => Promise<ApiResult<{ query: string; faceDetected: boolean; matches: import('./types').PhotoMatch[] }>>
     recheck: (profileId: string) => Promise<ApiResult<{ phash: string; faceDetected: boolean }>>
     profile: (profileId: string) => Promise<ApiResult<{ kind: string; status: string; faceDetected: boolean; phash: string | null }[]>>
-    matchFace: (cropDataUrl: string) => Promise<ApiResult<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]>>
-    saveFace: (payload: { profileId: string; cropDataUrl: string }) => Promise<ApiResult<{ tokenId: string }>>
+    matchFace: (payload: { cropDataUrl: string; geom?: number[] } | string) => Promise<ApiResult<{ profileId: string; score: number; phashSim: number; faceSim: number | null; name: string; code: string; avatar: string | null }[]>>
+    saveGeom: (payload: { profileId: string; geom: number[]; kind?: 'avatar' | 'gallery' | 'attachment' }) => Promise<ApiResult<null>>
+    saveFace: (payload: { profileId: string; cropDataUrl: string; geom?: number[] }) => Promise<ApiResult<{ tokenId: string }>>
     docStatus: () => Promise<ApiResult<{ queued: number; processing: number; done: number; failed: number; lastError: string | null }>>
     ocrAll: () => Promise<ApiResult<{ queued: number }>>
     docSearch: (text: string) => Promise<ApiResult<{ attachmentId: string; profileId: string; name: string; snippet: string }[]>>

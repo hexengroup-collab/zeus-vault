@@ -568,6 +568,14 @@ export const MIGRATIONS: Migration[] = [
       `)
     },
   },
+  {
+    version: 8,
+    name: 'face-geometry',
+    up: (db) => {
+      // Measured anatomical geometry for precise person matching.
+      db.exec(`ALTER TABLE photo_tokens ADD COLUMN face_geom TEXT`)
+    },
+  },
 ]
 
 export function migrate(db: Db): { version: number; applied: number[] } {

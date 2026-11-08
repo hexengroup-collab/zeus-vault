@@ -207,6 +207,17 @@ export function ProfileForm({ mode }: { mode: 'create' | 'edit' }) {
     toastInfo('Fields applied to form', 'Review uncertain matches before saving.')
   }
 
+  const captureGeom = async (dataUrl: string | null | undefined, profileId: string) => {
+    if (!dataUrl) return
+    try {
+      const { captureGeometry } = await import('@/lib/facefinder')
+      const geom = await captureGeometry(dataUrl)
+      if (geom) await call(zeus.photos.saveGeom({ profileId, geom, kind: 'avatar' }))
+    } catch {
+      /* geometry capture is optional */
+    }
+  }
+
   // ---------------- save ----------------
   const submit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -217,11 +228,15 @@ export function ProfileForm({ mode }: { mode: 'create' | 'edit' }) {
       if (mode === 'create') {
         const created = await call(zeus.profiles.create(input))
         if (avatar) await call(zeus.profiles.setAvatar({ id: created.id, dataUrl: avatar }))
+        void captureGeom(avatar, created.id)
         toastOk('Dossier created', created.profileCode)
         navigate(`/profiles/${created.id}`)
       } else if (id) {
         const result = await call(zeus.profiles.update({ id, input }))
-        if (avatar !== undefined) await call(zeus.profiles.setAvatar({ id, dataUrl: avatar }))
+        if (avatar !== undefined) {
+          await call(zeus.profiles.setAvatar({ id, dataUrl: avatar }))
+          void captureGeom(avatar, id)
+        }
         toastOk('Dossier updated', `${result.changes} field(s) changed`)
         navigate(`/profiles/${id}`)
       }

@@ -74,6 +74,34 @@ export function ImageSearch() {
     }
   }
 
+  const [geomBusy, setGeomBusy] = useState(false)
+  const [geomDone, setGeomDone] = useState(false)
+
+  const backfillGeom = async () => {
+    if (geomBusy) return
+    setGeomBusy(true)
+    try {
+      const { captureGeometry } = await import('@/lib/facefinder')
+      const all = await call(zeus.profiles.list({ view: 'all-status', page: 1, pageSize: 250 }))
+      let n = 0
+      for (const p of all.rows) {
+        if (!p.avatar) continue
+        const geom = await captureGeometry(p.avatar)
+        if (geom) {
+          await call(zeus.photos.saveGeom({ profileId: p.id, geom, kind: 'avatar' }))
+          n++
+        }
+        await new Promise((r) => setTimeout(r, 50))
+      }
+      setGeomDone(true)
+      toastOk('Face geometry built', `${n} avatar(s) now carry measured face data`)
+    } catch (e) {
+      toastError('Geometry backfill failed', e instanceof Error ? e.message : undefined)
+    } finally {
+      setGeomBusy(false)
+    }
+  }
+
   const pending = (queue?.queued ?? 0) + (queue?.processing ?? 0)
 
   return (
@@ -131,6 +159,9 @@ export function ImageSearch() {
             }
           >
             <FolderOpen size={13} /> Tokenize all photos
+          </button>
+          <button className="vault-btn vault-btn-ghost h-10" onClick={() => void backfillGeom()} disabled={geomBusy}>
+            <ScanFace size={13} /> {geomBusy ? 'Measuring faces…' : geomDone ? 'Faces measured ✓' : 'Build face geometry (avatars)'}
           </button>
         </div>
 

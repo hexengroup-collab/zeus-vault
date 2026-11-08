@@ -253,8 +253,15 @@ export function registerIpc(ctx: AppContext): void {
   handle('photos:search', 'unlock', (payload: { dataUrl: string; view?: string; categoryId?: string; country?: string; text?: string; minScore?: number }) => ctx.photos!.search(String(payload.dataUrl ?? ''), { view: payload.view, categoryId: payload.categoryId, country: payload.country, text: payload.text, minScore: payload.minScore }))
   handle('photos:recheck', 'unlock', (profileId: string) => ctx.photos!.recheck(String(profileId ?? '')))
   handle('photos:profile', 'unlock', (profileId: string) => ctx.photos!.profileTokens(String(profileId ?? '')))
-  handle('photos:saveFace', 'standard', (payload: { profileId: string; cropDataUrl: string }) => ctx.photos!.saveFace(String(payload.profileId ?? ''), String(payload.cropDataUrl ?? '')))
-  handle('photos:matchFace', 'unlock', (cropDataUrl: string) => ctx.photos!.matchFace(String(cropDataUrl ?? '')))
+  handle('photos:saveFace', 'standard', (payload: { profileId: string; cropDataUrl: string; geom?: number[] }) => ctx.photos!.saveFace(String(payload.profileId ?? ''), String(payload.cropDataUrl ?? ''), Array.isArray(payload.geom) ? payload.geom : null))
+  handle('photos:matchFace', 'unlock', (payload: { cropDataUrl: string; geom?: number[] } | string) => {
+    if (typeof payload === 'string') return ctx.photos!.matchFace(payload)
+    return ctx.photos!.matchFace(String(payload.cropDataUrl ?? ''), Array.isArray(payload.geom) ? payload.geom : null)
+  })
+  handle('photos:saveGeom', 'standard', (payload: { profileId: string; geom: number[]; kind?: 'avatar' | 'gallery' | 'attachment' }) => {
+    ctx.photos!.saveGeom(String(payload.profileId ?? ''), payload.geom, payload.kind ?? 'avatar')
+    return null
+  })
   handle('docs:status', 'unlock', () => ctx.docs!.status({ ...actorOf(), userId: userIdOf() } as never))
   handle('docs:ocrAll', 'standard', () => ctx.docs!.enqueueAll())
   handle('docs:search', 'unlock', (text: string) => ctx.docs!.search(String(text ?? '')))
