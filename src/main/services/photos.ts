@@ -244,14 +244,13 @@ export class PhotosService {
       }
       if (!vecs.length) continue
       const dim = vecs[0].length
-      const mean = new Array<number>(dim).fill(0)
+      const mean = Array.from({ length: dim }, () => 0)
       for (const v of vecs) for (let i = 0; i < dim; i++) mean[i] += v[i] / vecs.length
       const norm = Math.sqrt(mean.reduce((a, b) => a + b * b, 0)) || 1
       centroids.set(pid, { vec: mean.map((x) => x / norm), base: list.find((r) => r.face_desc) ?? list[0] })
     }
     const best = new Map<string, { profileId: string; score: number; distance: number | null; phashSim: number; faceSim: number | null }>()
     for (const [pid, centroid] of centroids) {
-      const base = byProfile.get(pid) ?? []
       const r = centroid.base
       if (!r) continue
       const t = this.rowToToken(r)
