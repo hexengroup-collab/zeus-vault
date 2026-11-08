@@ -1,12 +1,12 @@
 # Pre-Push Audit Report
 
-**Date:** 2026-11-08
+**Date:** 2026-11-08 (refreshed)
 **Repo:** `hexengroup-collab/zeus-vault` — branch `main`
-**HEAD at audit:** `b863d6a` — "Update About screenshot (publisher-only) and release checksum docs"
+**HEAD at audit:** `bbec2f9` — "Fix audit findings, add lint, CI, and pre-push hook"
 **Remote:** `https://github.com/hexengroup-collab/zeus-vault.git`
-**Auditor:** automated pre-push audit (typecheck, tests, build, secrets scan, history scan, dependency audit, git hygiene)
+**Auditor:** automated pre-push audit (typecheck, lint, tests, build, secrets scan, history scan, dependency audit, git hygiene)
 
-> This file is the only change in this push. No source, config, or binary files are included.
+> Refreshed report — see the Remediation addendum at the end of this file. The release installer was rebuilt and `SHA256SUMS.txt` refreshed alongside this update.
 
 ## Verdict
 
@@ -19,10 +19,11 @@
 | Secrets / credential scan (tracked + history) | ✅ PASS — no real secrets found |
 | Tracked sensitive artifacts (.db/.key/.pem/.env) | ✅ PASS — none tracked |
 | Large files / repo size | ✅ PASS — largest blob 479 KB, no LFS needed |
-| Dependency audit (prod) | ⚠️ WARN — 2 moderate (see §6) |
-| Dependency audit (dev toolchain) | ⚠️ WARN — 1 critical `tar` + 1 moderate `minimatch` (build-time only) |
-| CI / hooks / lint | ⚠️ WARN — no CI, no lint script, no active pre-push hook |
+| Dependency audit (prod) | ✅ CLEAN — 0 vulnerabilities (see addendum) |
+| Dependency audit (dev toolchain) | ✅ CLEAN — 0 vulnerabilities (see addendum) |
+| CI / hooks / lint | ✅ CI + oxlint + pre-push hook active (see addendum) |
 | Tag hygiene | ✅ FIXED before push — `v1.0.0` remote tag fetched locally |
+| Release installer | ✅ REBUILT — `SHA256SUMS.txt` refreshed (see addendum) |
 
 **Overall: SAFE TO PUSH this report-only commit.** The two dependency warnings are pre-existing and do not block a docs-only push. They should be tracked as follow-up maintenance (see §6).
 
@@ -185,3 +186,7 @@ Verified: `npm audit` (full): **found 0 vulnerabilities**. `npm ls minimatch` tr
 - `npm run build` ✅ (tsc + Vite renderer + main)
 - `npm run lint` ✅ (0 errors, warnings only)
 - `npm audit` (full) ✅ 0 vulnerabilities
+
+### Release rebuilt
+
+- `npm run dist` ✅ — `release/ZeusVault-1.0.0-Setup.exe` rebuilt with the fixed dependency tree (205,687,407 bytes); `SHA256SUMS.txt` refreshed to `108442a2…`. The installer binary itself stays gitignored; only the checksum is tracked.
