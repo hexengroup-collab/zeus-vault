@@ -1,6 +1,20 @@
-# Zeus Vault 1.1.0 - Release Notes
+# Zeus Vault 1.1.1 - Release Notes
 
-**Release type:** Intelligence update
+**Release type:** Bug-fix update
+**License:** MIT
+**Platforms:** Windows (primary), Linux-ready
+
+## What's fixed in 1.1.1
+
+- **Blank window fixed** — packaged app now loads over a local secure protocol.
+- **Person Finder verified live** — MediaPipe + deep descriptors find side profiles and partial faces; strict tolerance and margin rules prevent false names.
+- **Tokens purge on delete** — deleting a dossier erases its face/photo/document intelligence everywhere.
+- **Inherit face data** — re-creating the same person carries references over; Duplicate also clones them.
+- **Search quality** — alias translation in NLP + semantic modes, tolerant recall, TF-IDF ranking.
+- **PDF contrast** — dossier exports readable dark-on-white.
+- **CI gate repaired** — CodeQL action upgraded for the recurring download timeouts.
+
+1.1.0 intelligence (Person Finder, OCR, QR, photo search, 24 MCP tools) all included.
 **License:** MIT
 **Platforms:** Windows (primary), Linux-ready
 
@@ -33,7 +47,7 @@
 
 ## First run
 
-1. Double-click `ZeusVault-1.1.0-Setup.exe` and pick your install location.
+1. Double-click `ZeusVault-1.1.1-Setup.exe` and pick your install location.
 2. Finish the wizard to install and launch the app.
 3. The first-run setup appears before login: it mints the master key, initializes the encrypted database, and asks you to create the **master administrator account**.
 4. Sign in with those credentials. The vault seals automatically after inactivity; re-enter your password to unseal.

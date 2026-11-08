@@ -10,7 +10,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.1.0-e34b64?style=for-the-badge)](.)
+[![Version](https://img.shields.io/badge/version-1.1.1-e34b64?style=for-the-badge)](.)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-critical?style=for-the-badge)](.)
 [![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM-d97757?style=for-the-badge)](#security-model)
 [![Hashing](https://img.shields.io/badge/hashing-Argon2id-d97757?style=for-the-badge)](#security-model)
@@ -290,7 +290,7 @@ Each box maps to a real subsystem in `src/main`:
 
 ### Use the standalone installer
 
-A packaged Windows (or Linux) build ships with the release artifacts: `release/ZeusVault-1.1.0-Setup.exe`.
+A packaged Windows (or Linux) build ships with the release artifacts: `release/ZeusVault-1.1.1-Setup.exe`.
 
 1. Run the installer.
 2. The wizard lets you change the installation directory (default: `%LOCALAPPDATA%\Programs\Zeus Vault`), choose Desktop and Start Menu shortcuts, then press Install.

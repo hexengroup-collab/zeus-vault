@@ -1,6 +1,6 @@
 import type { AppSettings, Role } from './types'
 
-export const APP_VERSION = '1.1.0'
+export const APP_VERSION = '1.1.1'
 export const APP_TITLE = 'ZEUS VAULT'
 
 export const DEFAULT_SETTINGS: AppSettings = {
