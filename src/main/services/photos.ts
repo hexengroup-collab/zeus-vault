@@ -250,22 +250,24 @@ export class PhotosService {
       centroids.set(pid, { vec: mean.map((x) => x / norm), base: list.find((r) => r.face_desc) ?? list[0] })
     }
     const best = new Map<string, { profileId: string; score: number; distance: number | null; phashSim: number; faceSim: number | null }>()
-    for (const [pid, centroid] of centroids) {
-      const r = centroid.base
+    const descriptorMode = desc?.length && centroids.size > 0
+    const matchRows = descriptorMode ? [...centroids.values()].map((c) => ({ pid: c.base!.profile_id, c })) : rows.map((r) => ({ pid: r.profile_id, c: null as null }))
+    for (const { pid, c } of matchRows) {
+      const r = c?.base ?? rows.find((row) => row.profile_id === pid)
       if (!r) continue
       const t = this.rowToToken(r)
       if (!t) continue
       let s = scoreFaceToken(q, t)
-      const d = desc?.length ? descriptorDistance(desc, centroid.vec) : null
       let distance: number | null = null
-      if (desc?.length) {
+      if (descriptorMode && c) {
+        const d = descriptorDistance(desc!, c.vec)
         if (d === null || d > DESCRIPTOR_TOLERANCE) continue
         distance = d
         s = { score: Math.round((1 - d) * 1000) / 10, phashSim: s.phashSim, faceSim: Math.round((1 - d) * 50) }
       }
-      const prev = best.get(r.profile_id)
+      const prev = best.get(pid)
       if (!prev || s.score > prev.score) {
-        best.set(r.profile_id, { profileId: r.profile_id, score: s.score, distance, phashSim: s.phashSim, faceSim: s.faceSim })
+        best.set(pid, { profileId: pid, score: s.score, distance, phashSim: s.phashSim, faceSim: s.faceSim })
       }
     }
     const ranked = [...best.values()].filter((m) => m.score >= 70).sort((a, b) => b.score - a.score).slice(0, 3)
