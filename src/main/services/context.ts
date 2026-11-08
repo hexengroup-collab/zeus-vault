@@ -145,14 +145,17 @@ export class AppContext {
     this.profiles!.photoHook = (profileId, imageId, kind) => this.photos!.enqueue(profileId, imageId, kind)
     this.profiles!.photoRemovedHook = (profileId, imageId, kind) => this.photos!.removeToken(profileId, imageId, kind)
     this.profiles!.ocrHook = (attachmentId, profileId) => this.docs!.enqueue(attachmentId, profileId)
-    // Backfill existing vaults so image search works without manual steps.
+    // Backfill existing vaults so search works without manual steps.
     setImmediate(() => {
       try {
         if (db.value<number>('SELECT COUNT(*) FROM photo_tokens WHERE status = ? AND phash IS NOT NULL', ['done']) === 0) {
           this.photos!.enqueueAllProfiles()
         }
+        if ((db.value<number>('SELECT COUNT(*) FROM text_embeddings') ?? 0) === 0) {
+          this.nlp!.embedAll()
+        }
       } catch {
-        /* token queue is best-effort */
+        /* backfill is best-effort */
       }
     })
     this.transfer = new TransferService(db, this.profiles, this.audit, this.settings, vault.fieldKey, this.paths.exportsDir)
