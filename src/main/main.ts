@@ -41,25 +41,28 @@ const MIME: Record<string, string> = {
   '.tflite': 'application/octet-stream',
 }
 
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, allowServiceWorkers: false } },
+])
+
 function registerAppProtocol(): void {
   try {
-    protocol.registerSchemesAsPrivileged([
-      { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, allowServiceWorkers: false } },
-    ])
     protocol.handle('app', async (req) => {
       const u = new URL(req.url)
       const host = u.hostname && u.hostname !== '.' ? `${u.hostname}/` : ''
       let rel = decodeURIComponent(`${host}${u.pathname}`).replace(/^\/+/, '')
       if (!rel || rel.endsWith('/')) rel = `${rel}index.html`
       const file = path.normalize(path.join(distDir, rel))
-      if (!file.startsWith(distDir) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+      const ok = file.startsWith(distDir) && fs.existsSync(file) && fs.statSync(file).isFile()
+      bootLog(`app-protocol ${req.url} -> ${file} ${ok ? 'ok' : '404'}`)
+      if (!ok) {
         return new Response('Not found', { status: 404 })
       }
       const data = fs.readFileSync(file)
       return new Response(data as BodyInit, { status: 200, headers: { 'Content-Type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream' } })
     })
-  } catch {
-    /* protocol already registered */
+  } catch (e) {
+    bootLog('[app://] handle registration failed', e)
   }
 }
 
@@ -114,12 +117,16 @@ function createWindow(): BrowserWindow {
   })
 
   win.webContents.on('will-navigate', (event, url) => {
-    if (isDev && url.startsWith(DEV_URL!)) return
+    if (isDev && DEV_URL && url.startsWith(DEV_URL!)) return
+    if (!isDev && url.startsWith('app://')) return
     event.preventDefault()
   })
 
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     bootLog(`did-fail-load ${errorCode} ${errorDescription} @ ${validatedURL}`)
+    if (!isDev && validatedURL?.startsWith('app://')) {
+      void win.loadFile(path.join(distDir, 'index.html'))
+    }
   })
   win.webContents.on('console-message', (_event, _level, message) => {
     bootLog(`[renderer] ${message}`)
@@ -166,8 +173,8 @@ if (!gotLock) {
   })
 
   app.setAppUserModelId('com.zeusvault.app')
-  registerAppProtocol()
   app.whenReady().then(() => {
+    registerAppProtocol()
     const rootDir = app.getPath('userData')
     fs.mkdirSync(rootDir, { recursive: true })
     ctx = new AppContext(rootDir)

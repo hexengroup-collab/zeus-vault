@@ -529,6 +529,45 @@ export const MIGRATIONS: Migration[] = [
       `)
     },
   },
+  {
+    version: 7,
+    name: 'attachment-tokens-and-ocr',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS photo_tokens_v2 (
+          id TEXT PRIMARY KEY,
+          profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          image_id TEXT,
+          kind TEXT NOT NULL CHECK (kind IN ('avatar','gallery','attachment')),
+          phash TEXT,
+          ahash TEXT,
+          face_detected INTEGER NOT NULL DEFAULT 0,
+          face_phash TEXT,
+          face_box TEXT,
+          histogram TEXT,
+          status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','processing','done','failed')),
+          error TEXT,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO photo_tokens_v2 SELECT * FROM photo_tokens;
+        DROP TABLE photo_tokens;
+        ALTER TABLE photo_tokens_v2 RENAME TO photo_tokens;
+        CREATE INDEX IF NOT EXISTS idx_photo_tokens_profile ON photo_tokens(profile_id);
+        CREATE INDEX IF NOT EXISTS idx_photo_tokens_status ON photo_tokens(status);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_photo_tokens_unique ON photo_tokens(profile_id, image_id, kind);
+        CREATE TABLE IF NOT EXISTS document_text (
+          attachment_id TEXT PRIMARY KEY REFERENCES attachments(id) ON DELETE CASCADE,
+          profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          text TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','processing','done','failed')),
+          error TEXT,
+          updated_at TEXT NOT NULL
+        );
+      `)
+    },
+  },
 ]
 
 export function migrate(db: Db): { version: number; applied: number[] } {

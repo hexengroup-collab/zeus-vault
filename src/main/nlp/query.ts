@@ -15,7 +15,7 @@ function startOfDay(d: Date): Date {
 
 function stripSearchWords(text: string): string {
   return text
-    .replace(/\b(find|show|list|search|get|give|display|bring|pull|fetch|look up|lookup|all|me|everyone|everybody|profiles?|people|persons?|records?|dossiers?|subjects?|candidates?|contacts?|clients?|partners?|stakeholders?|beneficiaries|witnesses|experts|investors|customers?|employees|students?|colleagues?|that|which|who|whose|with|have|has|having|having got|are|is|the|a|an|created|updated|edited|modified|matching|called|named)\b/gi, ' ')
+    .replace(/\b(find|show|list|search|get|give|display|bring|pull|fetch|look up|lookup|all|me|everyone|everybody|profiles?|people|persons?|records?|dossiers?|subjects?|candidates?|contacts?|clients?|partners?|stakeholders?|beneficiaries|witnesses|experts|investors|customers?|employees|students?|colleagues?|that|which|who|whose|with|have|has|having|having got|are|is|the|a|an|from|into|about|located|based|working|works|work|employed|job|created|updated|edited|modified|matching|called|named)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -252,6 +252,17 @@ export function interpretQuery(rawText: string, opts: { currentUsername?: string
         filters.industry = val
         clauses.push({ field: 'industry', label: 'Industry', value: val, confidence: 'inferred' })
         residual = residual.replace(inIndustry[0], ' ')
+      }
+    } else {
+      // Bare industry words, e.g. "technology" alone.
+      const bare = new RegExp(`\\b(${Object.keys(INDUSTRY_MAP).join('|')})(?:\\s+industry|\\s+sector)?\\b`).exec(residual)
+      if (bare) {
+        const val = INDUSTRY_MAP[bare[1]]
+        if (val) {
+          filters.industry = val
+          clauses.push({ field: 'industry', label: 'Industry', value: val, confidence: 'inferred' })
+          residual = residual.replace(bare[0], ' ')
+        }
       }
     }
   }
