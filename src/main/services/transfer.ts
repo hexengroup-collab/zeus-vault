@@ -549,8 +549,8 @@ async function buildDossierPdf(d: ProfileDetail, includeSensitive: boolean): Pro
       y = pageHeight - margin
     }
     y -= 10
-    page.drawLine({ start: { x: margin, y: y + 4 }, end: { x: pageWidth - margin, y: y + 4 }, thickness: 0.7, color: rgb(0.89, 0.29, 0.39) })
-    page.drawText(title.toUpperCase(), { x: margin, y: y - 11, size: 9.5, font: bold, color: rgb(0.84, 0.61, 0.27) })
+    page.drawLine({ start: { x: margin, y: y + 4 }, end: { x: pageWidth - margin, y: y + 4 }, thickness: 0.7, color: rgb(0.55, 0.16, 0.23) })
+    page.drawText(title.toUpperCase(), { x: margin, y: y - 11, size: 9.5, font: bold, color: rgb(0.55, 0.16, 0.23) })
     y -= 24
   }
   const field = (label: string, value: string) => {
@@ -558,8 +558,8 @@ async function buildDossierPdf(d: ProfileDetail, includeSensitive: boolean): Pro
       page = doc.addPage([pageWidth, pageHeight])
       y = pageHeight - margin
     }
-    page.drawText(label.toUpperCase(), { x: margin, y, size: 6.3, font: bold, color: rgb(0.52, 0.54, 0.57) })
-    page.drawText(String(value || ' - ').slice(0, 95), { x: margin, y: y - 11, size: 9, font, color: rgb(0.95, 0.95, 0.94) })
+    page.drawText(label.toUpperCase(), { x: margin, y, size: 6.3, font: bold, color: rgb(0.33, 0.36, 0.38) })
+    page.drawText(String(value || ' - ').slice(0, 95), { x: margin, y: y - 11, size: 9, font, color: rgb(0.1, 0.11, 0.13) })
     y -= 26
   }
 
@@ -616,7 +616,7 @@ async function buildDossierPdf(d: ProfileDetail, includeSensitive: boolean): Pro
   const pages = doc.getPages()
   pages.forEach((p, i) => {
     p.drawText(`ZEUS VAULT · DOSSIER ${d.profileCode} · PAGE ${i + 1}/${pages.length}`, {
-      x: margin, y: 22, size: 6.5, font: mono, color: rgb(0.4, 0.42, 0.46),
+      x: margin, y: 22, size: 6.5, font: mono, color: rgb(0.35, 0.37, 0.4),
     })
   })
   return doc.save()
