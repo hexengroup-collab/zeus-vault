@@ -210,11 +210,11 @@ export function ProfileForm({ mode }: { mode: 'create' | 'edit' }) {
   const captureGeom = async (dataUrl: string | null | undefined, profileId: string) => {
     if (!dataUrl) return
     try {
-      const { captureGeometry } = await import('@/lib/facefinder')
-      const geom = await captureGeometry(dataUrl)
-      if (geom) await call(zeus.photos.saveGeom({ profileId, geom, kind: 'avatar' }))
+      const { captureDescriptor } = await import('@/lib/facefinder')
+      const desc = await captureDescriptor(dataUrl)
+      if (desc) await call(zeus.photos.saveDesc({ profileId, desc, kind: 'avatar' }))
     } catch {
-      /* geometry capture is optional */
+      /* descriptor capture is optional */
     }
   }
 

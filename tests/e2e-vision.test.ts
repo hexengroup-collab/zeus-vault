@@ -121,8 +121,10 @@ describe('e2e: photo token pipeline', () => {
     const s = ctx.photos.status(ctx.admin)
     expect(s.done).toBeGreaterThanOrEqual(2)
     const tokens = ctx.photos.profileTokens(idA)
+    // Canonical pipeline: main tokens are object-level only; face claims
+    // come from the renderer's deep descriptor pipeline.
     expect(tokens.find((t) => t.kind === 'avatar')?.status).toBe('done')
-    expect(tokens.find((t) => t.kind === 'avatar')?.faceDetected).toBe(true)
+    expect(tokens.find((t) => t.kind === 'avatar')?.faceDetected).toBe(false)
   }, 30_000)
 
   it('finds the same image at ~100% and rejects different images', async () => {

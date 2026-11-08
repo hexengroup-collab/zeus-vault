@@ -6,7 +6,19 @@ import { detectPeople, type DetectedFace } from '@/lib/facefinder'
 import { toastError, toastOk } from '@/stores/toast'
 import type { ProfileListItem } from '@shared/types'
 
-const FEATURE_POINTS = [1, 33, 263, 468, 473, 61, 291, 199, 90, 13, 14, 234, 454, 127, 356]
+const FEATURE_POINTS = [0, 8, 16, 36, 39, 42, 45, 48, 54, 27, 30]
+const MESH_LINKS: [number, number][] = []
+for (let i = 0; i < 16; i++) MESH_LINKS.push([i, i + 1])
+for (let i = 17; i < 24; i++) MESH_LINKS.push([i, i + 1])
+for (let i = 27; i < 34; i++) MESH_LINKS.push([i, i + 1])
+for (let i = 36; i < 41; i++) MESH_LINKS.push([i, i + 1])
+MESH_LINKS.push([41, 36])
+for (let i = 42; i < 47; i++) MESH_LINKS.push([i, i + 1])
+MESH_LINKS.push([47, 42])
+for (let i = 48; i < 59; i++) MESH_LINKS.push([i, i + 1])
+MESH_LINKS.push([59, 48])
+for (let i = 61; i < 67; i++) MESH_LINKS.push([i, i + 1])
+MESH_LINKS.push([67, 61])
 const BOX_COLORS = ['#E34B64', '#5F8FB0', '#4F8A6B', '#D69B45', '#8A7FB0', '#7A8B9A', '#C86F4A']
 
 export function PersonFinder() {
@@ -14,7 +26,6 @@ export function PersonFinder() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [src, setSrc] = useState<string | null>(null)
   const [faces, setFaces] = useState<DetectedFace[]>([])
-  const [tess, setTess] = useState<{ start: number; end: number }[]>([])
   const [dims, setDims] = useState({ w: 0, h: 0 })
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState<number | null>(null)
@@ -45,7 +56,7 @@ export function PersonFinder() {
 
   const saveFaceTo = async (face: DetectedFace, profile: ProfileListItem) => {
     try {
-      await call(zeus.photos.saveFace({ profileId: profile.id, cropDataUrl: face.crop, geom: face.geom ?? undefined }))
+      await call(zeus.photos.saveFace({ profileId: profile.id, cropDataUrl: face.crop, geom: undefined, desc: face.desc ?? undefined }))
       toastOk('Face saved', `${face.match ? 'updated' : 'new'} reference under ${profile.fullName} (${profile.profileCode})`)
       setSaveFor(null)
     } catch (e) {
@@ -61,19 +72,24 @@ export function PersonFinder() {
     setBusy(true)
     setModelStatus('loading')
     try {
-      const r = await detectPeople(url)
-      setTess(r.tess)
-      setDims({ w: r.width, h: r.height })
+      const detected = await detectPeople(url)
+      const probe = new Image()
+      await new Promise<void>((res) => {
+        probe.onload = () => res()
+        probe.onerror = () => res()
+        probe.src = url
+      })
+      setDims({ w: probe.naturalWidth, h: probe.naturalHeight })
       setModelStatus('ready')
-      if (r.faces.length === 0) {
+      if (detected.length === 0) {
         toastError('No faces found', 'Try a clearer, front-facing photo.')
         return
       }
-      toastOk(`${r.faces.length} face${r.faces.length === 1 ? '' : 's'} found`, 'Matching each face against stored photo tokens…')
+      toastOk(`${detected.length} face${detected.length === 1 ? '' : 's'} found`, 'Matching each face against stored face descriptors (distance ≤ 0.6)…')
       const withMatch = await Promise.all(
-        r.faces.map(async (f) => {
+        detected.map(async (f) => {
           try {
-            const hits = await call(zeus.photos.matchFace({ cropDataUrl: f.crop, geom: f.geom ?? undefined }))
+            const hits = await call(zeus.photos.matchFace({ cropDataUrl: f.crop, geom: undefined, desc: f.desc ?? undefined }))
             const best = hits[0]
             return best ? { ...f, match: { profileId: best.profileId, score: best.score, name: best.name, code: best.code } } : f
           } catch {
@@ -132,16 +148,16 @@ export function PersonFinder() {
                 return (
                   <g key={f.index} onMouseEnter={() => setHover(f.index)} onMouseLeave={() => setHover(null)} onClick={() => f.match && navigate(`/profiles/${f.match.profileId}`)} className={f.match ? 'cursor-pointer' : ''}>
                     <rect x={f.box.x} y={f.box.y} width={f.box.w} height={f.box.h} fill="none" stroke={c} strokeWidth={active ? 6 : 3} />
-                    {tess.map((t, j) => {
-                      const a = f.landmarks[t.start]
-                      const b = f.landmarks[t.end]
-                      if (!a || !b) return null
-                      return <line key={j} x1={a.x * dims.w} y1={a.y * dims.h} x2={b.x * dims.w} y2={b.y * dims.h} stroke={c} strokeWidth={0.8} opacity={active ? 0.9 : 0.45} />
+                    {MESH_LINKS.map(([a, b], j) => {
+                      const pa = f.landmarks[a]
+                      const pb = f.landmarks[b]
+                      if (!pa || !pb) return null
+                      return <line key={j} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke={c} strokeWidth={1.2} opacity={active ? 0.9 : 0.45} />
                     })}
                     {FEATURE_POINTS.map((p, j) => {
                       const pt = f.landmarks[p]
                       if (!pt) return null
-                      return <circle key={j} cx={pt.x * dims.w} cy={pt.y * dims.h} r={dims.w * 0.006} fill={c} />
+                      return <circle key={j} cx={pt.x} cy={pt.y} r={dims.w * 0.006} fill={c} />
                     })}
                     {f.match ? (
                       <g>

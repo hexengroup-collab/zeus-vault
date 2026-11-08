@@ -33,6 +33,17 @@ export interface PhotoMatch {
   image?: string | null
 }
 
+// Descriptor distance with ageitgey-tolerance semantics:
+// descriptors are L2-normalized (distance 0..2); <= 0.6 counts as a match.
+export function descriptorDistance(a: number[] | null, b: number[] | null): number | null {
+  if (!a || !b || a.length !== b.length || a.length === 0) return null
+  let s = 0
+  for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) * (a[i] - b[i])
+  return Math.sqrt(s)
+}
+
+export const DESCRIPTOR_TOLERANCE = 0.6
+
 export function dataUrlToBuffer(dataUrl: string): Buffer {
   const m = /^data:([\w/+.-]+);base64,(.+)$/.exec(dataUrl)
   if (!m) throw new Error('Invalid image data URL')
@@ -155,37 +166,19 @@ export async function tokenizeImage(dataUrl: string): Promise<PhotoToken> {
     .raw()
     .toBuffer({ resolveWithObject: true })
 
-  const faceBox = findFaceLikeRegion(rgb128, meta128.width, meta128.height)
-  let facePhash: string | null = null
-  if (faceBox) {
-    const scaleX = meta32.width / 128
-    const scaleY = meta32.height / 128
-    const fx = Math.floor(faceBox.x * scaleX)
-    const fy = Math.floor(faceBox.y * scaleY)
-    const fw = Math.max(2, Math.round(faceBox.w * scaleX))
-    const fh = Math.max(2, Math.round(faceBox.h * scaleY))
-    const crop = new Uint8Array(fw * fh)
-    for (let y = 0; y < fh; y++) {
-      for (let x = 0; x < fw; x++) {
-        const sx = Math.min(31, fx + x)
-        const sy = Math.min(31, fy + y)
-        crop[y * fw + x] = gray32[sy * 32 + sx]
-      }
-    }
-    const resizedGray = new Uint8Array(32 * 32)
-    for (let ty = 0; ty < 32; ty++) {
-      for (let tx = 0; tx < 32; tx++) {
-        resizedGray[ty * 32 + tx] = crop[Math.floor((ty * fh) / 32) * fw + Math.floor((tx * fw) / 32)]
-      }
-    }
-    facePhash = phashFromGray(resizedGray)
-  }
+  // Canonical face data comes from the renderer face pipeline (MediaPipe).
+  // Main-side skin heuristics mislabel non-face regions, so they never
+  // create face claims here.
+  void rgb128
+  void findFaceLikeRegion
+  const faceBox = null
+  const facePhash: string | null = null
 
   return {
     phash: phashFromGray(gray32),
     ahash: ahashFromGray(gray32),
     histogram: histogramFromRgb(rgb128, meta128.width, meta128.height),
-    faceDetected: faceBox !== null,
+    faceDetected: false,
     facePhash,
     faceBox,
     faceGeom: null,
@@ -236,26 +229,43 @@ export function scoreFaceToken(q: PhotoToken, t: PhotoToken): { score: number; p
 }
 
 // Face geometry: relative distances between anatomical anchors, normalized
-// by inter-ocular distance so size and position do not matter.
+// by face height (forehead-to-chin) so it stays stable for frontal views
+// AND side profiles. Distances are mirror-invariant.
 const IO_A = 133
 const IO_B = 362
-const ANCHORS = [1, 152, 61, 291, 13, 14, 127, 356, 10, 234, 454, 168]
+const NOSE = 1
+const CHIN = 152
+const FOREHEAD = 10
+const MOUTH_L = 61
+const MOUTH_R = 291
+const MOUTH_TOP = 13
+const MOUTH_BOT = 14
+const EAR_A = 127
+const EAR_B = 356
+const CHEEK_A = 234
+const CHEEK_B = 454
 export function biometricsFromLandmarks(lm: { x: number; y: number }[]): number[] | null {
   if (!lm || lm.length < 479) return null
   const pt = (i: number) => lm[i]
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+  const height = dist(pt(FOREHEAD), pt(CHIN))
+  if (!Number.isFinite(height) || height < 1e-6) return null
   const io = dist(pt(IO_A), pt(IO_B))
-  if (!Number.isFinite(io) || io < 1e-6) return null
-  const out: number[] = []
-  for (const i of ANCHORS) {
-    const p = pt(i)
-    const mid = { x: (pt(IO_A).x + pt(IO_B).x) / 2, y: (pt(IO_A).y + pt(IO_B).y) / 2 }
-    out.push(dist(p, mid) / io)
-  }
-  const mouthW = dist(pt(61), pt(291)) / io
-  const noseEye = dist(pt(1), pt(IO_A)) / io
-  out.push(mouthW, noseEye)
-  return out.map((v) => Math.round(v * 10000) / 10000)
+  const eyeMid = { x: (pt(IO_A).x + pt(IO_B).x) / 2, y: (pt(IO_A).y + pt(IO_B).y) / 2 }
+  const feats = [
+    dist(pt(NOSE), pt(CHIN)) / height,
+    dist(eyeMid, pt(NOSE)) / height,
+    dist(eyeMid, pt(CHIN)) / height,
+    dist(pt(EAR_A), pt(CHIN)) / height,
+    dist(pt(EAR_B), pt(CHIN)) / height,
+    dist(pt(MOUTH_L), pt(MOUTH_R)) / height,
+    dist(pt(MOUTH_TOP), pt(MOUTH_BOT)) / height,
+    dist(pt(EAR_A), pt(NOSE)) / height,
+    dist(pt(EAR_B), pt(NOSE)) / height,
+    dist(pt(CHEEK_A), pt(CHEEK_B)) / height,
+    io / height,
+  ]
+  return feats.map((v) => Math.round(v * 10000) / 10000)
 }
 
 export function cosineSim(a: number[] | null, b: number[] | null): number | null {

@@ -576,6 +576,27 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`ALTER TABLE photo_tokens ADD COLUMN face_geom TEXT`)
     },
   },
+  {
+    version: 9,
+    name: 'token-reset-canonical',
+    up: (db) => {
+      // Clean slate: new canonical pipeline. All image matching below this
+      // migration is discarded and rebuilt with the renderer too.
+      db.exec(`
+        DELETE FROM photo_tokens;
+        DELETE FROM document_text;
+        DELETE FROM text_embeddings;
+      `)
+    },
+  },
+  {
+    version: 10,
+    name: 'face-descriptors',
+    up: (db) => {
+      // Deep face descriptors (128-dim, L2 distance matcher).
+      db.exec(`ALTER TABLE photo_tokens ADD COLUMN face_desc TEXT`)
+    },
+  },
 ]
 
 export function migrate(db: Db): { version: number; applied: number[] } {

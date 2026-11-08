@@ -162,13 +162,13 @@ export function Dossier() {
         } else {
           await call(zeus.profiles.addGalleryImage({ id: d.id, name: file.name, dataUrl }))
           toastOk('Image added', file.name)
-          // Capture face geometry from the new image (best-effort, local).
+          // Capture deep face descriptor from the new image (best-effort).
           try {
-            const { captureGeometry } = await import('@/lib/facefinder')
-            const geom = await captureGeometry(dataUrl)
-            if (geom) await call(zeus.photos.saveGeom({ profileId: d.id, geom, kind: 'gallery' }))
+            const { captureDescriptor } = await import('@/lib/facefinder')
+            const desc = await captureDescriptor(dataUrl)
+            if (desc) await call(zeus.photos.saveDesc({ profileId: d.id, desc, kind: 'gallery' }))
           } catch {
-            /* geometry capture is optional */
+            /* descriptor capture is optional */
           }
         }
         await reload()

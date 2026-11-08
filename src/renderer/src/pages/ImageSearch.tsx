@@ -81,22 +81,22 @@ export function ImageSearch() {
     if (geomBusy) return
     setGeomBusy(true)
     try {
-      const { captureGeometry } = await import('@/lib/facefinder')
+      const { captureDescriptor } = await import('@/lib/facefinder')
       const all = await call(zeus.profiles.list({ view: 'all-status', page: 1, pageSize: 250 }))
       let n = 0
       for (const p of all.rows) {
         if (!p.avatar) continue
-        const geom = await captureGeometry(p.avatar)
-        if (geom) {
-          await call(zeus.photos.saveGeom({ profileId: p.id, geom, kind: 'avatar' }))
+        const desc = await captureDescriptor(p.avatar)
+        if (desc) {
+          await call(zeus.photos.saveDesc({ profileId: p.id, desc, kind: 'avatar' }))
           n++
         }
         await new Promise((r) => setTimeout(r, 50))
       }
       setGeomDone(true)
-      toastOk('Face geometry built', `${n} avatar(s) now carry measured face data`)
+      toastOk('Face descriptors built', `${n} avatar(s) now carry deep face data`)
     } catch (e) {
-      toastError('Geometry backfill failed', e instanceof Error ? e.message : undefined)
+      toastError('Backfill failed', e instanceof Error ? e.message : undefined)
     } finally {
       setGeomBusy(false)
     }

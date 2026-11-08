@@ -66,6 +66,7 @@ const api: ZeusApi = {
     profile: (profileId) => ipcRenderer.invoke('photos:profile', profileId),
     matchFace: (payload) => ipcRenderer.invoke('photos:matchFace', payload),
     saveGeom: (payload) => ipcRenderer.invoke('photos:saveGeom', payload),
+    saveDesc: (payload) => ipcRenderer.invoke('photos:saveDesc', payload),
     saveFace: (payload) => ipcRenderer.invoke('photos:saveFace', payload),
     docStatus: () => ipcRenderer.invoke('docs:status'),
     ocrAll: () => ipcRenderer.invoke('docs:ocrAll'),
