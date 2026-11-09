@@ -69,13 +69,13 @@
 After downloading, verify the installer matches the published checksum:
 
 ```powershell
-certutil -hashfile .\ZeusVault-1.0.0-Setup.exe SHA256
+certutil -hashfile .\ZeusVault-1.1.1-Setup.exe SHA256
 ```
 
 Or read it from the `SHA256SUMS.txt` file in the repository root:
 
 ```
-807c605f73732ffda5485956dbdadf6018777c0195720412425149b8981eb67d  ZeusVault-1.0.0-Setup.exe
+d3d3882a0835046a89c6b89eedee8870a4567e07de1d02a9d1407060766dfa81  ZeusVault-1.1.1-Setup.exe
 ```
 
 Compare to the hash published on the release page. If the hash differs, do not run the file.
