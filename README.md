@@ -58,12 +58,14 @@ A private encrypted dossier workstation for the desktop. Every profile is a stru
 | | Zeus Vault | Typical profile managers |
 | --- | --- | --- |
 | Storage | Encrypted everywhere (AES-256-GCM field encryption, Argon2id, hash-chained audit ledger) | Spreadsheet / CSV / CLIs of plain text |
-| Visual search | On-device face descriptors + perceptual tokens — same person found across photos | Photo albums, no identity matching |
-| Person finding | 478-point biometrics, meshes, boxes, evidence distances on every verdict | None |
-| Text + NLP | Natural-language queries with alias translation and stem-aware recall | Keyword filters only |
+| Visual search | On-device face descriptors (ageitgey-style distance matching) + perceptual tokens across every photo and attachment | Photo albums, no identity matching |
+| Person finding | MediaPipe detection incl. side profiles, 478-point biometrics (x, y, z), 4-crop ensembles, quality-aware precision, strict tolerance + margin rules, shame-free "no confident match" verdicts | None |
+| Text + NLP | Natural-language queries with alias translation and tolerant recall | Keyword filters only |
 | Semantic search | TF-IDF local embeddings, semantic profile ranking | None |
-| Documents | OCR on attachments, searched by visible text, QR decoded | Manual folder digging |
-| Connectivity | Local MCP server with API keys (24 tools), full RBAC | Zip files |
+| Documents | Offline OCR (Tesseract) on image attachments, searched by visible text and QR payloads | Manual folder digging |
+| Photos scope | Attachments, galleries, documents — everything is tokenized once on upload, never re-scanned | None |
+| Connectivity | Local MCP server with API keys (24 tools incl. `photos_image_search`, `photos_match_face`, `photos_bind_face`), full RBAC | Zip files |
+| Intelligence loop | Training backfill covers avatars, galleries, and attachments; confirmed identities attach as references and sharpen matching | Static records |
 | Telemetry | Zero — every byte stays on the machine, verified in Security Center | Ad-supported / cloud-locked |
 
 **The manager that understands faces, documents, and plain language — and proves it with hashes.**
@@ -73,10 +75,10 @@ A private encrypted dossier workstation for the desktop. Every profile is a stru
 ## Five Ways to Find Anything
 
 - **Text + NLP** — natural-language queries with alias translation and tolerant recall.
-- **Semantic** — TF-IDF local embeddings rank by meaning, not keywords.
-- **Documents (OCR)** — image attachments are read offline; searchable by their visible text.
-- **Photos** — perceptual tokens match objects, scenes, and anything in the archive.
-- **Person Finder** — MediaPipe detection + deep face descriptors (face-api) measured on-device; identity verdicts only when tolerance *and* winning margin agree.
+- **Semantic** — TF-IDF local embeddings rank by meaning, not keywords; auto-rebuilt after every token reset.
+- **Documents (OCR)** — offline Tesseract reads image attachments; searchable by visible text, with QR decoding in Photos mode.
+- **Photos** — perceptual tokens match objects, scenes, and documents across the whole archive without re-scanning; foreground/background tokens stay one-at-a-time with visible progress.
+- **Person Finder** — MediaPipe detection (frontal, side, half-visible) + deep descriptors measured on-device; identity is only named when distance *and* winning margin agree, otherwise it honestly reports "no confident match / new person".
 
 ---
 
