@@ -483,12 +483,14 @@ Enforced in the main process on every IPC call, not only in the interface.
 
 ## Roadmap
 
-Planned for upcoming versions:
+Shipped in 1.1.x:
 
-- **Face match.** A local facial recognition model that detects faces inside profile photos and matches a photo against the whole archive without sending anything anywhere.
-- **Image search through the database.** Reverse image lookup and perceptual-hash search across all dossiers, combined with structured field filters.
-- **Model upgrades.** A wider deterministic NLP vocabulary, user-editable aliases, and optional local embeddings for semantic search inside the authorized vault.
-- **Export destinations.** More folder choices and destination presets for exports and backups.
+- **Face match — live.** MediaPipe + face-api deep descriptors find faces inside profile, gallery, and attachment photos and match them across the whole archive locally — side profiles and partial faces included, quality-aware precision, distance evidence on every verdict.
+- **Image search — live.** Perceptual tokens + QR decoding across dossiers with structured field filters (Global Search → Photos).
+- **Model upgrades — live.** Wider deterministic NLP vocabulary, user-editable aliases (Settings → Database), and local TF-IDF embeddings for semantic search.
+- **Export destinations — live.** Folder presets (Vault, Documents, Desktop, Downloads, ask-each-time) for exports and backups.
+
+Still planned: GPU-accelerated face engines, PDF text extraction for native PDFs, and an encrypted profile-sharing protocol.
 
 ---
 
