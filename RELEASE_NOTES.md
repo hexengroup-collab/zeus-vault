@@ -62,7 +62,7 @@
 
 | File | What for |
 | --- | --- |
-| `ZeusVault-1.0.0-Setup.exe` | Windows installer (self-contained; includes Electron runtime and all DLLs) |
+| `ZeusVault-1.1.1-Setup.exe` | Windows installer (self-contained; includes Electron runtime and all DLLs) |
 
 ### Verify the download (SHA-256)
 
